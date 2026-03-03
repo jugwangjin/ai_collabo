@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>집단 지성 아스키 아트 - ASCII SWARM</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 40, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #0f0;
+            pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+        h1 { margin: 0; font-size: 16px; letter-spacing: 2px; text-transform: uppercase; }
+        p { margin: 5px 0 0; font-size: 10px; opacity: 0.8; }
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 11px;
+            color: #0f0;
+            opacity: 0.5;
+            letter-spacing: 2px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #0f0;
+            text-decoration: none;
+            font-size: 11px;
+            padding: 5px 10px;
+            border: 1px solid #0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← TERMINAL EXIT</a>
+    <div class="ui">
+        <h1>ASCII SWARM v1.0</h1>
+        <p>EMERGENT INTELLIGENCE SYSTEM</p>
+    </div>
+    <div class="hint">CLICK: GRAVITY | KEYBOARD: INJECT NEW ALPHA</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+        let mouse = { x: -1000, y: -1000, pressed: false };
+        let chars = ['@', '#', '&', '*', '+', '.', '?', '!', '$', '%'];
+        let currentAlpha = '@';
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            initParticles();
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.char = chars[Math.floor(Math.random() * chars.length)];
+                this.size = Math.random() * 8 + 8;
+                this.hue = Math.random() * 60 + 100; // Greenish
+            }
+
+            update() {
+                // Flocking: Separation, Alignment, Cohesion (Simplified)
+                let fx = 0, fy = 0;
+                let count = 0;
+                const senseDist = 50;
+
+                // Mouse interaction
+                if (mouse.pressed) {
+                    const dx = mouse.x - this.x;
+                    const dy = mouse.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < 400) {
+                        fx += dx * 0.005;
+                        fy += dy * 0.005;
+                    }
+                }
+
+                this.vx += fx;
+                this.vy += fy;
+                this.vx *= 0.98; // Friction
+                this.vy *= 0.98;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Screen Wrap
+                if (this.x < -20) this.x = width + 20;
+                if (this.x > width + 20) this.x = -20;
+                if (this.y < -20) this.y = height + 20;
+                if (this.y > height + 20) this.y = -20;
+            }
+
+            draw() {
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 50%)`;
+                ctx.font = `${this.size}px monospace`;
+                ctx.fillText(this.char, this.x, this.y);
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = Math.floor((width * height) / 1200);
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', () => mouse.pressed = true);
+        window.addEventListener('mouseup', () => mouse.pressed = false);
+        window.addEventListener('keydown', (e) => {
+            if (e.key.length === 1) {
+                currentAlpha = e.key;
+                particles.forEach(p => {
+                    if (Math.random() < 0.3) p.char = currentAlpha;
+                });
+            }
+        });
+
+        function animate() {
+            // Matrix-like fading effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            // Drawing the "Alpha" influence
+            if (mouse.pressed) {
+                ctx.strokeStyle = '#0f0';
+                ctx.beginPath();
+                ctx.arc(mouse.x, mouse.y, 15, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        resize();
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자가 복제 기계어 생태계 - MACHINE CODE ECO</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #020202;
+            color: #ff0;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated; /* Essential for the raw code look */
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(40, 40, 0, 0.7);
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ff0;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.1);
+        }
+        h1 { margin: 0; font-size: 14px; letter-spacing: 1px; color: #ff0; }
+        p { margin: 5px 0 0; font-size: 10px; opacity: 0.7; color: #fff; }
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: #ff0;
+            opacity: 0.4;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #ff0;
+            text-decoration: none;
+            font-size: 10px;
+            padding: 4px 8px;
+            border: 1px solid #ff0;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← EXIT COMPILER</a>
+    <div class="ui">
+        <h1>MACHINE CODE ECOSYSTEM v2.0</h1>
+        <p>SELF-REPLICATING DIGITAL LIFEFORM</p>
+    </div>
+    <div class="hint">DRAG: INJECT VOLTAGE (MUTATION) | SPACE: RESET</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const RESOLUTION = 14; 
+        let cols, rows;
+        let grid = [];
+        let nextGrid = [];
+        let mouse = { x: -100, y: -100, down: false };
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            cols = Math.floor(canvas.width / RESOLUTION);
+            rows = Math.floor(canvas.height / RESOLUTION);
+            initGrid();
+        }
+
+        function initGrid() {
+            grid = [];
+            for (let i = 0; i < cols; i++) {
+                grid[i] = [];
+                for (let j = 0; j < rows; j++) {
+                    // Random 0 or 1, or empty
+                    if (Math.random() > 0.9) grid[i][j] = Math.random() > 0.5 ? 1 : 0;
+                    else grid[i][j] = null;
+                }
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousedown', () => mouse.down = true);
+        window.addEventListener('mouseup', () => mouse.down = false);
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = Math.floor(e.clientX / RESOLUTION);
+            mouse.y = Math.floor(e.clientY / RESOLUTION);
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') initGrid();
+        });
+
+        function update() {
+            nextGrid = [];
+            for (let i = 0; i < cols; i++) {
+                nextGrid[i] = [];
+                for (let j = 0; j < rows; j++) {
+                    const current = grid[i][j];
+                    const neighbors = getNeighbors(i, j);
+                    
+                    // Core Logic: Replication vs Death
+                    if (current !== null) {
+                        // Under-population or over-population
+                        if (neighbors.total < 2 || neighbors.total > 4) nextGrid[i][j] = null;
+                        else nextGrid[i][j] = current; // Stay same
+                    } else {
+                        // Repopulation (If neighbors are mostly 1s, new 1, else new 0)
+                        if (neighbors.total === 3) {
+                            nextGrid[i][j] = neighbors.ones > neighbors.zeros ? 1 : 0;
+                        } else {
+                            nextGrid[i][j] = null;
+                        }
+                    }
+
+                    // Mutation / Injection by mouse
+                    if (mouse.down && Math.abs(mouse.x - i) < 3 && Math.abs(mouse.y - j) < 3) {
+                        if (Math.random() < 0.2) nextGrid[i][j] = Math.random() > 0.5 ? 1 : 0;
+                    }
+                }
+            }
+            grid = nextGrid;
+        }
+
+        function getNeighbors(x, y) {
+            let ones = 0;
+            let zeros = 0;
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    if (i === 0 && j === 0) continue;
+                    const nx = (x + i + cols) % cols;
+                    const ny = (y + j + rows) % rows;
+                    const val = grid[nx][ny];
+                    if (val === 1) ones++;
+                    else if (val === 0) zeros++;
+                }
+            }
+            return { ones, zeros, total: ones + zeros };
+        }
+
+        function draw() {
+            ctx.fillStyle = '#020202';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    const val = grid[i][j];
+                    if (val !== null) {
+                        ctx.fillStyle = val === 1 ? '#ff0' : '#fff';
+                        ctx.font = `${RESOLUTION - 2}px monospace`;
+                        ctx.fillText(val, i * RESOLUTION, j * RESOLUTION + (RESOLUTION - 2));
+                    }
+                }
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            setTimeout(() => requestAnimationFrame(loop), 50); // Slightly slower for readability
+        }
+
+        resize();
+        loop();
+    </script>
+</body>
+</html>
