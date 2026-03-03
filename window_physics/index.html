@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>비압축 유체 시뮬레이터 - INCOMPRESSIBLE FLUID PHYSICS</title>
+    <title>비압축 유체 시뮬레이터 - FLUID CONFIGURATOR</title>
     <style>
         body {
             margin: 0;
@@ -23,14 +23,22 @@
             left: 20px;
             z-index: 100;
             background: rgba(0, 210, 255, 0.05);
-            padding: 12px 18px;
-            border-radius: 4px;
+            padding: 15px;
+            border-radius: 8px;
             border: 1px solid rgba(0, 210, 255, 0.4);
-            pointer-events: none;
-            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            width: 220px;
+            transition: transform 0.3s, opacity 0.3s;
         }
-        h1 { margin: 0; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
-        .data { margin-top: 8px; font-size: 10px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+        .ui.hidden { transform: translateX(-250px); opacity: 0; pointer-events: none; }
+        h1 { margin: 0 0 15px 0; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid rgba(0, 210, 255, 0.2); padding-bottom: 5px; }
+        
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: block; font-size: 9px; margin-bottom: 4px; opacity: 0.7; }
+        .control-group input { width: 100%; cursor: pointer; accent-color: #00d2ff; }
+        .val-display { float: right; font-weight: bold; color: #fff; }
+
         #back-btn {
             position: absolute;
             top: 20px;
@@ -43,39 +51,76 @@
             border: 1px solid rgba(0, 210, 255, 0.3);
             border-radius: 20px;
             pointer-events: auto;
-            transition: all 0.2s;
         }
-        #back-btn:hover { background: rgba(0, 210, 255, 0.1); border-color: #00d2ff; }
     </style>
 </head>
 <body>
-    <a href="../index.html" id="back-btn">← TERMINAL EXIT</a>
-    <div class="ui">
-        <h1>Fluid Dynamics v4.0</h1>
-        <div class="data" id="debug">
-            SYSTEM: STABLE<br>
-            DENSITY: CALCULATING...
+    <a href="../index.html" id="back-btn">← EXIT</a>
+    
+    <div class="ui" id="controls">
+        <h1>FLUID CONFIG</h1>
+        <div class="control-group">
+            <label>PRESSURE (GAS) <span class="val-display" id="v-gas">1200</span></label>
+            <input type="range" id="i-gas" min="100" max="8000" value="1200">
         </div>
+        <div class="control-group">
+            <label>VISCOSITY <span class="val-display" id="v-visc">400</span></label>
+            <input type="range" id="i-visc" min="0" max="2000" value="400">
+        </div>
+        <div class="control-group">
+            <label>INERTIA SENSE <span class="val-display" id="v-inertia">0.2</span></label>
+            <input type="range" id="i-inertia" min="0" max="2" step="0.05" value="0.2">
+        </div>
+        <div class="control-group">
+            <label>GRAVITY (Y) <span class="val-display" id="v-grav">0</span></label>
+            <input type="range" id="i-grav" min="-2" max="2" step="0.1" value="0">
+        </div>
+        <div style="font-size: 8px; opacity: 0.5; margin-top: 10px;">TIP: PRESS 'H' TO TOGGLE UI</div>
     </div>
     <canvas id="canvas"></canvas>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const debugEl = document.getElementById('debug');
+        const controls = document.getElementById('controls');
+
+        // Dynamic Config
+        let CONFIG = {
+            GAS_CONST: 1200,
+            VISC: 400,
+            INERTIA: 0.2,
+            GRAVITY: 0,
+            H: 26,
+            RHO0: 1.0,
+            MASS: 1.0,
+            DT: 0.4,
+            DAMP: -0.3
+        };
+
+        // Slider Setup
+        const sliders = {
+            'i-gas': 'GAS_CONST',
+            'i-visc': 'VISC',
+            'i-inertia': 'INERTIA',
+            'i-grav': 'GRAVITY'
+        };
+
+        Object.keys(sliders).forEach(id => {
+            const input = document.getElementById(id);
+            const display = document.getElementById(id.replace('i-', 'v-'));
+            input.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                CONFIG[sliders[id]] = val;
+                display.innerText = val;
+            });
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'h') controls.classList.toggle('hidden');
+        });
 
         let width, height;
         let particles = [];
-        
-        // SPH / Fluid Constants - Tuned for Stability
-        const H = 26;           // Interaction radius
-        const GAS_CONST = 1200; // Lowered for softer pressure
-        const RHO0 = 1.0;       // Target rest density
-        const VISC = 400;       // Higher viscosity for "syrup-like" stability
-        const MASS = 1.0;
-        const DT = 0.4;         // Smaller time step for stability
-        const BOUNDARY_DAMPING = -0.3;
-
         let lastWinX = null;
         let lastWinY = null;
         let winVX = 0;
@@ -100,10 +145,9 @@
         function init() {
             resize();
             particles = [];
-            // Create a dense block of fluid in the center
             const cols = 22;
             const rows = 16;
-            const spacing = H * 0.5;
+            const spacing = CONFIG.H * 0.5;
             const startX = width / 2 - (cols * spacing) / 2;
             const startY = height / 2 - (rows * spacing) / 2;
             
@@ -124,12 +168,11 @@
                     const dx = p2.x - p1.x;
                     const dy = p2.y - p1.y;
                     const d2 = dx * dx + dy * dy;
-                    if (d2 < H * H) {
-                        p1.rho += MASS * (315 / (64 * Math.PI * Math.pow(H, 9))) * Math.pow(H * H - d2, 3);
+                    if (d2 < CONFIG.H * CONFIG.H) {
+                        p1.rho += CONFIG.MASS * (315 / (64 * Math.PI * Math.pow(CONFIG.H, 9))) * Math.pow(CONFIG.H * CONFIG.H - d2, 3);
                     }
                 }
-                // Linear pressure for better stability
-                p1.p = GAS_CONST * (p1.rho - RHO0);
+                p1.p = CONFIG.GAS_CONST * (p1.rho - CONFIG.RHO0);
                 if (p1.p < 0) p1.p = 0;
             }
         }
@@ -145,22 +188,19 @@
                     const dy = p1.y - p2.y;
                     const d = Math.sqrt(dx * dx + dy * dy);
 
-                    if (d < H && d > 0.5) {
-                        // Pressure force
-                        const fp = MASS * (p1.p + p2.p) / (2 * p2.rho) * (-45 / (Math.PI * Math.pow(H, 6))) * Math.pow(H - d, 2);
+                    if (d < CONFIG.H && d > 0.5) {
+                        const fp = CONFIG.MASS * (p1.p + p2.p) / (2 * p2.rho) * (-45 / (Math.PI * Math.pow(CONFIG.H, 6))) * Math.pow(CONFIG.H - d, 2);
                         fpressX += fp * dx / d;
                         fpressY += fp * dy / d;
 
-                        // Viscosity force
-                        const fv = VISC * MASS * (45 / (Math.PI * Math.pow(H, 6))) * (H - d);
+                        const fv = CONFIG.VISC * CONFIG.MASS * (45 / (Math.PI * Math.pow(CONFIG.H, 6))) * (CONFIG.H - d);
                         fviscX += fv * (p2.vx - p1.vx) / p2.rho;
                         fviscY += fv * (p2.vy - p1.vy) / p2.rho;
                     }
                 }
 
-                // Smoothly dampen window inertia
-                const fextX = -winVX * 0.2; 
-                const fextY = -winVY * 0.2;
+                const fextX = -winVX * CONFIG.INERTIA; 
+                const fextY = -winVY * CONFIG.INERTIA + CONFIG.GRAVITY * 10;
 
                 p1.fx = fpressX + fviscX + fextX;
                 p1.fy = fpressY + fviscY + fextY;
@@ -169,32 +209,32 @@
 
         function integrate() {
             for (let p of particles) {
-                p.vx += DT * p.fx / p.rho;
-                p.vy += DT * p.fy / p.rho;
-                p.x += DT * p.vx;
-                p.y += DT * p.vy;
+                p.vx += CONFIG.DT * p.fx / p.rho;
+                p.vy += CONFIG.DT * p.fy / p.rho;
+                p.x += CONFIG.DT * p.vx;
+                p.y += CONFIG.DT * p.vy;
 
-                const pad = 8;
-                if (p.x < pad) { p.x = pad; p.vx *= BOUNDARY_DAMPING; }
-                if (p.x > width - pad) { p.x = width - pad; p.vx *= BOUNDARY_DAMPING; }
-                if (p.y < pad) { p.y = pad; p.vy *= BOUNDARY_DAMPING; }
-                if (p.y > height - pad) { p.y = height - pad; p.vy *= BOUNDARY_DAMPING; }
+                const pad = 10;
+                if (p.x < pad) { p.x = pad; p.vx *= CONFIG.DAMP; }
+                if (p.x > width - pad) { p.x = width - pad; p.vx *= CONFIG.DAMP; }
+                if (p.y < pad) { p.y = pad; p.vy *= CONFIG.DAMP; }
+                if (p.y > height - pad) { p.y = height - pad; p.vy *= CONFIG.DAMP; }
             }
         }
+
+        window.addEventListener('resize', resize);
 
         function animate() {
             ctx.fillStyle = '#030306';
             ctx.fillRect(0, 0, width, height);
 
             if (lastWinX !== null) {
-                // Low-pass filter for window movement to avoid jitter
                 winVX = (window.screenX - lastWinX) * 0.5 + winVX * 0.5;
                 winVY = (window.screenY - lastWinY) * 0.5 + winVY * 0.5;
             }
             lastWinX = window.screenX;
             lastWinY = window.screenY;
 
-            // Substepping: Run physics multiple times per frame for stability
             const substeps = 3;
             for(let i=0; i<substeps; i++) {
                 computeDensityPressure();
