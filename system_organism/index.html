@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시스템 유기체 (System Organism)</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; color: #fff; font-family: 'Pretendard', sans-serif; cursor: none; }
+        canvas { display: block; filter: blur(1.5px) contrast(1.2); }
+        .ui { position: absolute; top: 20px; left: 20px; font-size: 10px; opacity: 0.4; pointer-events: none; letter-spacing: 2px; line-height: 1.8; }
+        #status-monitor { position: absolute; bottom: 20px; right: 20px; text-align: right; }
+        .back-btn { position: absolute; top: 20px; right: 20px; color: #fff; text-decoration: none; font-size: 12px; opacity: 0.3; pointer-events: auto; }
+        .back-btn:hover { opacity: 1; color: #00ffcc; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; transition: opacity 0.5s; }
+    </style>
+</head>
+<body>
+    <div id="overlay"></div>
+    <div class="ui">
+        SYSTEM ORGANISM v1.0<br>
+        DATA MAPPING:<br>
+        - BATTERY -> LUMINOSITY & FLICKER<br>
+        - CPU LOAD -> VIBRATION & THERMAL<br>
+        - ONLINE -> GRAVITY DIRECTION
+    </div>
+    <div class="ui" id="status-monitor">
+        BATTERY: --%<br>
+        CPU STRESS: 0.0<br>
+        NETWORK: ONLINE
+    </div>
+    <a href="../index.html" class="back-btn">← PORTAL</a>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const monitor = document.getElementById('status-monitor');
+        const overlay = document.getElementById('overlay');
+        let width, height;
+        
+        let batteryLevel = 1.0;
+        let isCharging = true;
+        let isOnline = navigator.onLine;
+        let cpuStress = 0; // 0 to 1
+        let lastFrameTime = performance.now();
+        
+        const particles = [];
+        const PARTICLE_COUNT = 400;
+
+        class Particle {
+            constructor() {
+                this.init();
+            }
+            init() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.size = Math.random() * 2 + 1;
+                this.hue = 180;
+            }
+            update() {
+                // Gravity based on Network status
+                const gravity = isOnline ? 0.05 : -0.05;
+                this.vy += gravity;
+
+                // Stress based jitter
+                const jitter = cpuStress * 15;
+                this.vx += (Math.random() - 0.5) * jitter;
+                this.vy += (Math.random() - 0.5) * jitter;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Friction
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+
+                // Boundary
+                if (this.x < 0) { this.x = 0; this.vx *= -1; }
+                if (this.x > width) { this.x = width; this.vx *= -1; }
+                if (this.y < 0) { this.y = 0; this.vy *= -1; }
+                if (this.y > height) { this.y = height; this.vy *= -1; }
+
+                // Color based on Stress
+                this.hue = 180 - (cpuStress * 180); // Blue to Red
+            }
+            draw() {
+                ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${0.3 + (1 - cpuStress) * 0.4})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size + cpuStress * 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+        // System Data Access
+        if (navigator.getBattery) {
+            navigator.getBattery().then(bat => {
+                const updateBat = () => {
+                    batteryLevel = bat.level;
+                    isCharging = bat.charging;
+                };
+                bat.addEventListener('levelchange', updateBat);
+                bat.addEventListener('chargingchange', updateBat);
+                updateBat();
+            });
+        }
+
+        window.addEventListener('online', () => isOnline = true);
+        window.addEventListener('offline', () => isOnline = false);
+
+        function measureStress() {
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+            
+            // Expected 16.6ms for 60fps. Higher delta means more "stress"
+            const target = 16.66;
+            const currentStress = Math.max(0, (delta - target) / 50);
+            cpuStress = cpuStress * 0.95 + currentStress * 0.05; // Smoothing
+            cpuStress = Math.min(1, cpuStress);
+        }
+
+        function animate() {
+            measureStress();
+            
+            // Battery based visuals
+            const brightness = 30 + batteryLevel * 70;
+            const flicker = (!isCharging && batteryLevel < 0.2) ? (Math.random() > 0.95 ? 0 : 1) : 1;
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.1 + cpuStress * 0.2})`; // Motion blur based on stress
+            ctx.fillRect(0, 0, width, height);
+            
+            canvas.style.opacity = flicker;
+            overlay.style.backgroundColor = `rgba(255, 0, 0, ${cpuStress * 0.1})`;
+            document.body.style.filter = `brightness(${brightness}%)`;
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            monitor.innerHTML = `
+                BATTERY: ${Math.floor(batteryLevel * 100)}% ${isCharging ? '(CHARGING)' : ''}<br>
+                CPU STRESS: ${cpuStress.toFixed(3)}<br>
+                NETWORK: ${isOnline ? 'ONLINE (GRAVITY ↓)' : 'OFFLINE (GRAVITY ↑)'}
+            `;
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
