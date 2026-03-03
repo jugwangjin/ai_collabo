@@ -90,10 +90,12 @@
                 this.radius = 7 + Math.random() * 3; // Smaller particles
             }
 
-            update(dw, dh) {
+            update(dw, dh, wvx, wvy) {
                 this.vy += GRAVITY;
-                this.vx -= winVX * INERTIA_SENSE;
-                this.vy -= winVY * INERTIA_SENSE;
+                
+                // Remove global inertia - only boundary forces will act now
+                // this.vx -= winVX * INERTIA_SENSE;
+                // this.vy -= winVY * INERTIA_SENSE;
 
                 this.x += this.vx;
                 this.y += this.vy;
@@ -102,10 +104,34 @@
                 this.vy *= VISCOSITY;
 
                 const pad = this.radius;
-                if (this.x < pad) { this.x = pad; this.vx = Math.abs(this.vx) * 0.4 + (dw < 0 ? Math.abs(dw) * 0.4 : 0); }
-                if (this.x > width - pad) { this.x = width - pad; this.vx = -Math.abs(this.vx) * 0.4 + (dw < 0 ? -Math.abs(dw) * 0.4 : 0); }
-                if (this.y < pad) { this.y = pad; this.vy = Math.abs(this.vy) * 0.4 + (dh < 0 ? Math.abs(dh) * 0.4 : 0); }
-                if (this.y > height - pad) { this.y = height - pad; this.vy = -Math.abs(this.vy) * 0.4 + (dh < 0 ? -Math.abs(dh) * 0.4 : 0); }
+                
+                // Boundary Physics: Walls now exert force based on BOTH resize (dw/dh) AND move (wvx/wvy)
+                // Left Wall
+                if (this.x < pad) { 
+                    this.x = pad; 
+                    // If wall moves towards particle (wvx < 0) or shrinks (dw < 0)
+                    let push = (wvx < 0 ? Math.abs(wvx) : 0) + (dw < 0 ? Math.abs(dw) * 0.5 : 0);
+                    this.vx = Math.abs(this.vx) * 0.3 + push * 0.8; 
+                }
+                // Right Wall
+                if (this.x > width - pad) { 
+                    this.x = width - pad; 
+                    // If wall moves towards particle (wvx > 0) or shrinks (dw < 0)
+                    let push = (wvx > 0 ? wvx : 0) + (dw < 0 ? Math.abs(dw) * 0.5 : 0);
+                    this.vx = -Math.abs(this.vx) * 0.3 - push * 0.8; 
+                }
+                // Top Wall
+                if (this.y < pad) { 
+                    this.y = pad; 
+                    let push = (wvy < 0 ? Math.abs(wvy) : 0) + (dh < 0 ? Math.abs(dh) * 0.5 : 0);
+                    this.vy = Math.abs(this.vy) * 0.3 + push * 0.8; 
+                }
+                // Bottom Wall
+                if (this.y > height - pad) { 
+                    this.y = height - pad; 
+                    let push = (wvy > 0 ? wvy : 0) + (dh < 0 ? Math.abs(dh) * 0.5 : 0);
+                    this.vy = -Math.abs(this.vy) * 0.3 - push * 0.8; 
+                }
 
                 const speed = Math.hypot(this.vx, this.vy);
                 if (speed > MAX_VEL) {
@@ -118,11 +144,11 @@
         function init() {
             resize();
             particles = [];
-            const count = 850; // Massively increased particle count
+            const count = 900; 
             for (let i = 0; i < count; i++) {
                 particles.push(new Particle(
-                    width/2 + (Math.random()-0.5) * 300,
-                    height/2 + (Math.random()-0.5) * 300
+                    width/2 + (Math.random()-0.5) * 400,
+                    height/2 + (Math.random()-0.5) * 400
                 ));
             }
             lastWinX = window.screenX;
@@ -156,27 +182,21 @@
             }
         }
 
-        window.addEventListener('resize', () => {
-            // Resize event is handled in the animate loop to get deltas
-        });
+        window.addEventListener('resize', () => {});
 
         function animate() {
-            // Calculate Window deltas
             const dw = window.innerWidth - lastInnerW;
             const dh = window.innerHeight - lastInnerH;
-            resize(); // Update width/height to current innerSize
+            
+            // Raw window velocity
+            const wvx = window.screenX - lastWinX;
+            const wvy = window.screenY - lastWinY;
+
+            resize();
             
             ctx.fillStyle = '#010103';
             ctx.fillRect(0, 0, width, height);
 
-            if (lastWinX !== null) {
-                const curWinVX = window.screenX - lastWinX;
-                const curWinVY = window.screenY - lastWinY;
-                winVX = winVX * 0.7 + curWinVX * 0.3;
-                winVY = winVY * 0.7 + curWinVY * 0.3;
-            }
-            
-            // Update reference values
             lastWinX = window.screenX;
             lastWinY = window.screenY;
             lastInnerW = window.innerWidth;
@@ -184,7 +204,7 @@
 
             // Physics
             resolveCollisions();
-            particles.forEach(p => p.update(dw, dh));
+            particles.forEach(p => p.update(dw, dh, wvx, wvy));
 
             // Rendering
             ctx.fillStyle = '#00f0ff';
