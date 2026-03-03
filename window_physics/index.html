@@ -67,14 +67,14 @@
         let width, height;
         let particles = [];
         
-        // SPH / Fluid Constants for Incompressibility
-        const H = 22;           // Interaction radius (Smaller for more detail)
-        const GAS_CONST = 4500; // Much higher for incompressibility
-        const RHO0 = 1.2;       // Target rest density
-        const VISC = 120;       // Viscosity
+        // SPH / Fluid Constants - Tuned for Stability
+        const H = 26;           // Interaction radius
+        const GAS_CONST = 1200; // Lowered for softer pressure
+        const RHO0 = 1.0;       // Target rest density
+        const VISC = 400;       // Higher viscosity for "syrup-like" stability
         const MASS = 1.0;
-        const DT = 0.65;         
-        const BOUNDARY_DAMPING = -0.4;
+        const DT = 0.4;         // Smaller time step for stability
+        const BOUNDARY_DAMPING = -0.3;
 
         let lastWinX = null;
         let lastWinY = null;
@@ -101,9 +101,9 @@
             resize();
             particles = [];
             // Create a dense block of fluid in the center
-            const cols = 20;
-            const rows = 15;
-            const spacing = H * 0.45;
+            const cols = 22;
+            const rows = 16;
+            const spacing = H * 0.5;
             const startX = width / 2 - (cols * spacing) / 2;
             const startY = height / 2 - (rows * spacing) / 2;
             
@@ -113,7 +113,6 @@
                     startY + Math.floor(i / cols) * spacing
                 ));
             }
-            // Initialize window position to prevent huge jump on first frame
             lastWinX = window.screenX;
             lastWinY = window.screenY;
         }
@@ -126,12 +125,11 @@
                     const dy = p2.y - p1.y;
                     const d2 = dx * dx + dy * dy;
                     if (d2 < H * H) {
-                        // Poly6 Kernel
                         p1.rho += MASS * (315 / (64 * Math.PI * Math.pow(H, 9))) * Math.pow(H * H - d2, 3);
                     }
                 }
-                // Tait-like equation for incompressibility
-                p1.p = GAS_CONST * (Math.pow(p1.rho / RHO0, 7) - 1);
+                // Linear pressure for better stability
+                p1.p = GAS_CONST * (p1.rho - RHO0);
                 if (p1.p < 0) p1.p = 0;
             }
         }
@@ -147,22 +145,22 @@
                     const dy = p1.y - p2.y;
                     const d = Math.sqrt(dx * dx + dy * dy);
 
-                    if (d < H && d > 0.1) {
-                        // Spiky Kernel Gradient for Pressure
+                    if (d < H && d > 0.5) {
+                        // Pressure force
                         const fp = MASS * (p1.p + p2.p) / (2 * p2.rho) * (-45 / (Math.PI * Math.pow(H, 6))) * Math.pow(H - d, 2);
                         fpressX += fp * dx / d;
                         fpressY += fp * dy / d;
 
-                        // Viscosity Laplacian
+                        // Viscosity force
                         const fv = VISC * MASS * (45 / (Math.PI * Math.pow(H, 6))) * (H - d);
                         fviscX += fv * (p2.vx - p1.vx) / p2.rho;
                         fviscY += fv * (p2.vy - p1.vy) / p2.rho;
                     }
                 }
 
-                // External force from Window Inertia
-                const fextX = -winVX * 0.45;
-                const fextY = -winVY * 0.45;
+                // Smoothly dampen window inertia
+                const fextX = -winVX * 0.2; 
+                const fextY = -winVY * 0.2;
 
                 p1.fx = fpressX + fviscX + fextX;
                 p1.fy = fpressY + fviscY + fextY;
@@ -171,14 +169,12 @@
 
         function integrate() {
             for (let p of particles) {
-                // Update velocity and position
                 p.vx += DT * p.fx / p.rho;
                 p.vy += DT * p.fy / p.rho;
                 p.x += DT * p.vx;
                 p.y += DT * p.vy;
 
-                // Simple wall interaction
-                const pad = 5;
+                const pad = 8;
                 if (p.x < pad) { p.x = pad; p.vx *= BOUNDARY_DAMPING; }
                 if (p.x > width - pad) { p.x = width - pad; p.vx *= BOUNDARY_DAMPING; }
                 if (p.y < pad) { p.y = pad; p.vy *= BOUNDARY_DAMPING; }
@@ -186,37 +182,36 @@
             }
         }
 
-        window.addEventListener('resize', resize);
-
         function animate() {
             ctx.fillStyle = '#030306';
             ctx.fillRect(0, 0, width, height);
 
-            // Calculate window velocity safely
             if (lastWinX !== null) {
-                winVX = window.screenX - lastWinX;
-                winVY = window.screenY - lastWinY;
+                // Low-pass filter for window movement to avoid jitter
+                winVX = (window.screenX - lastWinX) * 0.5 + winVX * 0.5;
+                winVY = (window.screenY - lastWinY) * 0.5 + winVY * 0.5;
             }
             lastWinX = window.screenX;
             lastWinY = window.screenY;
 
-            // Fluid simulation steps
-            computeDensityPressure();
-            computeForces();
-            integrate();
+            // Substepping: Run physics multiple times per frame for stability
+            const substeps = 3;
+            for(let i=0; i<substeps; i++) {
+                computeDensityPressure();
+                computeForces();
+                integrate();
+            }
 
-            // Render particles
             ctx.fillStyle = '#00d2ff';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 10;
             ctx.shadowColor = '#00d2ff';
             for (let p of particles) {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 2.8, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
                 ctx.fill();
             }
             ctx.shadowBlur = 0;
 
-            debugEl.innerHTML = `PARTICLES: ${particles.length}<br>INERTIA: [${winVX}, ${winVY}]`;
             requestAnimationFrame(animate);
         }
 
