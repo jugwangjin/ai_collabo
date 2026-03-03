@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>윈도우 유체 시뮬레이터 - LIQUID v7.0</title>
+    <title>윈도우 유체 시뮬레이터 - CONFIGURABLE v10.0</title>
     <style>
         body {
             margin: 0;
@@ -16,23 +16,78 @@
         }
         canvas {
             display: block;
-            /* Dense liquid look: lower blur for smaller particles */
-            filter: blur(5px) contrast(20);
+            filter: blur(6px) contrast(20);
         }
-        .ui {
+        .controls {
             position: absolute;
             top: 20px;
             left: 20px;
-            z-index: 100;
             background: rgba(0, 240, 255, 0.05);
-            padding: 8px 12px;
-            border: 1px solid rgba(0, 240, 255, 0.3);
-            pointer-events: none;
-            backdrop-filter: blur(5px);
-            filter: none !important;
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            pointer-events: auto;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            transform-origin: top left;
+            width: 180px;
         }
-        h1 { margin: 0; font-size: 11px; letter-spacing: 1px; }
-        .data { margin-top: 4px; font-size: 9px; opacity: 0.6; }
+        .controls.hidden {
+            opacity: 0;
+            transform: scale(0.8) translateY(-20px);
+            pointer-events: none;
+        }
+        #toggle-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 101;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            color: #00f0ff;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+        .controls-active #toggle-controls {
+            left: 215px;
+            background: #00f0ff;
+            color: black;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 14px; color: #00f0ff; letter-spacing: 1px; }
+        .input-group { margin-bottom: 10px; }
+        label { display: block; font-size: 10px; margin-bottom: 5px; opacity: 0.7; }
+        input[type="number"] {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            color: #fff;
+            padding: 5px;
+            border-radius: 4px;
+            outline: none;
+            font-family: inherit;
+        }
+        .btn {
+            width: 100%;
+            background: rgba(0, 240, 255, 0.2);
+            border: 1px solid #00f0ff;
+            color: #00f0ff;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 5px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #00f0ff; color: black; }
         #back-btn {
             position: absolute;
             top: 20px;
@@ -41,40 +96,69 @@
             color: #00f0ff;
             text-decoration: none;
             font-size: 10px;
-            padding: 4px 10px;
+            padding: 8px 15px;
             border: 1px solid rgba(0, 240, 255, 0.2);
             border-radius: 20px;
-            filter: none !important;
         }
     </style>
 </head>
-<body>
+<body class="controls-active">
     <a href="../index.html" id="back-btn">← EXIT</a>
-    <div class="ui">
-        <h1>Dense Liquid Engine v8.0</h1>
-        <div class="data" id="debug">SYSTEM: CALIBRATING...</div>
+    
+    <button id="toggle-controls">⚙️</button>
+    
+    <div class="controls" id="controls-panel">
+        <h1>WINDOW FLUID</h1>
+        <div class="input-group">
+            <label>입자 개수 (100 - 2500)</label>
+            <input type="number" id="particle-count" value="800" min="100" max="2500">
+        </div>
+        <button class="btn" id="apply-btn">설정 적용 및 초기화</button>
+        <p style="font-size: 8px; opacity: 0.5; margin-top: 10px; line-height: 1.4;">
+            * 입자가 많을수록 CPU 부하가 커집니다.<br>
+            * 모바일에서는 500개 이하를 권장합니다.
+        </p>
     </div>
+
     <canvas id="canvas"></canvas>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const debugEl = document.getElementById('debug');
-
+        
         let width, height;
         let particles = [];
         
-        // Liquid Constants - High Density Tuning
-        const RADIUS = 11;        // Smaller radius for more detail
-        const STIFFNESS = 0.3;    // Slightly stronger repulsion for small particles
-        const VISCOSITY = 0.955;  // More cohesive than water, less than syrup
-        const GRAVITY = 0.28;     
-        const INERTIA_SENSE = 0.22; 
-        const MAX_VEL = 22;
+        // Physics Config
+        const RADIUS = 15;        
+        const STIFFNESS = 0.2;   
+        const VISCOSITY = 0.94;   
+        const GRAVITY = 0.25;     
+        const MAX_VEL = 20;
 
         let lastWinX = null, lastWinY = null;
         let lastInnerW = window.innerWidth, lastInnerH = window.innerHeight;
-        let winVX = 0, winVY = 0;
+        let pCount = 800;
+
+        // UI Logic
+        const toggleBtn = document.getElementById('toggle-controls');
+        const panel = document.getElementById('controls-panel');
+        const countInput = document.getElementById('particle-count');
+        const applyBtn = document.getElementById('apply-btn');
+
+        toggleBtn.addEventListener('click', () => {
+            panel.classList.toggle('hidden');
+            document.body.classList.toggle('controls-active');
+            toggleBtn.innerHTML = panel.classList.contains('hidden') ? '⚙️' : '✕';
+        });
+
+        applyBtn.addEventListener('click', () => {
+            let val = parseInt(countInput.value);
+            if (isNaN(val)) val = 800;
+            pCount = Math.min(Math.max(val, 100), 2500);
+            countInput.value = pCount;
+            init();
+        });
 
         function resize() {
             width = window.innerWidth;
@@ -87,46 +171,33 @@
             constructor(x, y) {
                 this.x = x; this.y = y;
                 this.vx = 0; this.vy = 0;
-                this.radius = 7 + Math.random() * 3; // Smaller particles
+                this.radius = 7 + Math.random() * 3;
             }
 
             update(dw, dh, wvx, wvy) {
                 this.vy += GRAVITY;
-                
-                // Remove global inertia - only boundary forces will act now
-                // this.vx -= winVX * INERTIA_SENSE;
-                // this.vy -= winVY * INERTIA_SENSE;
-
                 this.x += this.vx;
                 this.y += this.vy;
-
                 this.vx *= VISCOSITY;
                 this.vy *= VISCOSITY;
 
                 const pad = this.radius;
                 
-                // Boundary Physics: Walls now exert force based on BOTH resize (dw/dh) AND move (wvx/wvy)
-                // Left Wall
                 if (this.x < pad) { 
                     this.x = pad; 
-                    // If wall moves towards particle (wvx < 0) or shrinks (dw < 0)
                     let push = (wvx < 0 ? Math.abs(wvx) : 0) + (dw < 0 ? Math.abs(dw) * 0.5 : 0);
                     this.vx = Math.abs(this.vx) * 0.3 + push * 0.8; 
                 }
-                // Right Wall
                 if (this.x > width - pad) { 
                     this.x = width - pad; 
-                    // If wall moves towards particle (wvx > 0) or shrinks (dw < 0)
                     let push = (wvx > 0 ? wvx : 0) + (dw < 0 ? Math.abs(dw) * 0.5 : 0);
                     this.vx = -Math.abs(this.vx) * 0.3 - push * 0.8; 
                 }
-                // Top Wall
                 if (this.y < pad) { 
                     this.y = pad; 
                     let push = (wvy < 0 ? Math.abs(wvy) : 0) + (dh < 0 ? Math.abs(dh) * 0.5 : 0);
                     this.vy = Math.abs(this.vy) * 0.3 + push * 0.8; 
                 }
-                // Bottom Wall
                 if (this.y > height - pad) { 
                     this.y = height - pad; 
                     let push = (wvy > 0 ? wvy : 0) + (dh < 0 ? Math.abs(dh) * 0.5 : 0);
@@ -144,8 +215,7 @@
         function init() {
             resize();
             particles = [];
-            const count = 900; 
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < pCount; i++) {
                 particles.push(new Particle(
                     width/2 + (Math.random()-0.5) * 400,
                     height/2 + (Math.random()-0.5) * 400
@@ -171,7 +241,6 @@
                         const overlap = RADIUS - dist;
                         const nx = dx / dist;
                         const ny = dy / dist;
-                        
                         const force = overlap * STIFFNESS;
                         p1.vx -= nx * force;
                         p1.vy -= ny * force;
@@ -182,18 +251,13 @@
             }
         }
 
-        window.addEventListener('resize', () => {});
-
         function animate() {
             const dw = window.innerWidth - lastInnerW;
             const dh = window.innerHeight - lastInnerH;
-            
-            // Raw window velocity
             const wvx = window.screenX - lastWinX;
             const wvy = window.screenY - lastWinY;
 
             resize();
-            
             ctx.fillStyle = '#010103';
             ctx.fillRect(0, 0, width, height);
 
@@ -202,24 +266,20 @@
             lastInnerW = window.innerWidth;
             lastInnerH = window.innerHeight;
 
-            // Physics
             resolveCollisions();
             particles.forEach(p => p.update(dw, dh, wvx, wvy));
 
-            // Rendering
             ctx.fillStyle = '#00f0ff';
             for (let p of particles) {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
-
-            debugEl.innerText = `LIQUID PARTICLES: ${particles.length} | BW: ${dw.toFixed(0)}`;
             requestAnimationFrame(animate);
         }
 
-            init();
-            animate();
+        init();
+        animate();
     </script>
 </body>
 </html>
