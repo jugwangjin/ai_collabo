@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>윈도우 인터페이스 물리 시뮬레이터 - THE WINDOW IS THE PHYSICS</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #08080a;
+            color: #ff3e00;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(255, 62, 0, 0.05);
+            padding: 15px;
+            border: 1px solid #ff3e00;
+            pointer-events: none;
+            backdrop-filter: blur(5px);
+        }
+        h1 { margin: 0; font-size: 14px; letter-spacing: 2px; }
+        .data { margin-top: 10px; font-size: 10px; line-height: 1.4; opacity: 0.8; }
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            opacity: 0.4;
+            letter-spacing: 2px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #ff3e00;
+            text-decoration: none;
+            font-size: 10px;
+            padding: 5px 10px;
+            border: 1px solid #ff3e00;
+        }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← SYSTEM EXIT</a>
+    <div class="ui">
+        <h1>WINDOW PHYSICS v1.0</h1>
+        <div class="data" id="debug">
+            POS: [0, 0]<br>
+            VEL: [0, 0]<br>
+            PRESSURE: 0%
+        </div>
+    </div>
+    <div class="hint">브라우저 창을 흔들거나 크기를 조절해 보세요</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const debugEl = document.getElementById('debug');
+
+        let width, height;
+        let particles = [];
+        
+        // Window State Tracking
+        let lastWinX = window.screenX;
+        let lastWinY = window.screenY;
+        let lastWinW = window.innerWidth;
+        let lastWinH = window.innerHeight;
+        let winVelX = 0;
+        let winVelY = 0;
+        let pressure = 0;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x || Math.random() * width;
+                this.y = y || Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 5;
+                this.vy = (Math.random() - 0.5) * 5;
+                this.radius = Math.random() * 5 + 3;
+                this.color = '#ff3e00';
+            }
+
+            update(extVX, extVY, pFactor) {
+                // Apply inertia from window movement
+                this.vx -= extVX * 0.8;
+                this.vy -= extVY * 0.8;
+
+                // Apply pressure force from resizing
+                if (pFactor > 1.0) {
+                    this.vx += (Math.random() - 0.5) * pFactor * 5;
+                    this.vy += (Math.random() - 0.5) * pFactor * 5;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Friction
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+
+                // Wall Collisions
+                if (this.x < this.radius) { this.x = this.radius; this.vx *= -0.7; }
+                if (this.x > width - this.radius) { this.x = width - this.radius; this.vx *= -0.7; }
+                if (this.y < this.radius) { this.y = this.radius; this.vy *= -0.7; }
+                if (this.y > height - this.radius) { this.y = height - this.radius; this.vy *= -0.7; }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Trail effect logic could go here
+            }
+        }
+
+        function init() {
+            particles = [];
+            for (let i = 0; i < 60; i++) {
+                particles.push(new Particle());
+            }
+            resize();
+        }
+
+        window.addEventListener('resize', resize);
+
+        function updateWindowState() {
+            // Calculate Movement Velocity
+            winVelX = window.screenX - lastWinX;
+            winVelY = window.screenY - lastWinY;
+            lastWinX = window.screenX;
+            lastWinY = window.screenY;
+
+            // Calculate Pressure (Size Change)
+            const area = window.innerWidth * window.innerHeight;
+            const lastArea = lastWinW * lastWinH;
+            pressure = Math.max(0, (lastArea - area) / 1000);
+            
+            lastWinW = window.innerWidth;
+            lastWinH = window.innerHeight;
+
+            debugEl.innerHTML = `
+                POS: [${lastWinX}, ${lastWinY}]<br>
+                VEL: [${winVelX.toFixed(1)}, ${winVelY.toFixed(1)}]<br>
+                PRESSURE: ${(pressure * 10).toFixed(1)}%
+            `;
+        }
+
+        function animate() {
+            // Background Clear
+            ctx.fillStyle = 'rgba(8, 8, 10, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+
+            updateWindowState();
+
+            particles.forEach(p => {
+                p.update(winVelX, winVelY, pressure);
+                p.draw();
+            });
+
+            // Draw connection lines if pressure is high
+            if (pressure > 0.5) {
+                ctx.strokeStyle = `rgba(255, 62, 0, ${Math.min(0.5, pressure)})`;
+                ctx.beginPath();
+                for(let i=0; i<particles.length; i+=5) {
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    if(particles[i+1]) ctx.lineTo(particles[i+1].x, particles[i+1].y);
+                }
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
