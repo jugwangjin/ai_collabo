@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>절차적 도시의 밤 - 네온 에디션</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #020408;
+            font-family: 'Pretendard', sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 300; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        p { margin: 5px 0 0; font-size: 12px; opacity: 0.6; }
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #fff;
+            text-decoration: none;
+            font-size: 12px;
+            opacity: 0.5;
+            padding: 8px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            pointer-events: auto;
+        }
+        #back-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← 포털로 돌아가기</a>
+    <div class="ui">
+        <h1>절차적 도시의 밤</h1>
+        <p>네온 시티 에디션</p>
+    </div>
+    <div class="hint">화면을 클릭하여 빌딩을 세워보세요</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let buildings = [];
+        let particles = [];
+        let traffic = [];
+
+        const colors = [
+            '#ff00ff', // Magenta
+            '#00ffff', // Cyan
+            '#ffff00', // Yellow
+            '#7000ff', // Purple
+            '#ff3e00'  // Orange
+        ];
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            // Re-render baseline or clear
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Building {
+            constructor(x, depth) {
+                this.x = x;
+                this.width = 40 + Math.random() * 80;
+                this.height = 0;
+                this.targetHeight = 100 + Math.random() * (height * 0.6);
+                this.depth = depth; // 0 (front) to 1 (back)
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.windows = [];
+                this.generateWindows();
+                this.growthSpeed = 2 + Math.random() * 5;
+            }
+
+            generateWindows() {
+                const rows = 15;
+                const cols = 4;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (Math.random() > 0.4) {
+                            this.windows.push({
+                                r: r, c: c,
+                                lit: Math.random() > 0.5,
+                                blinkSpeed: Math.random() * 0.02
+                            });
+                        }
+                    }
+                }
+            }
+
+            update() {
+                if (this.height < this.targetHeight) {
+                    this.height += this.growthSpeed;
+                }
+            }
+
+            draw() {
+                const scale = 1 - this.depth * 0.5;
+                const drawWidth = this.width * scale;
+                const drawHeight = this.height * scale;
+                const drawX = this.x;
+                const drawY = height - drawHeight;
+
+                // Building Shadow/Body
+                ctx.fillStyle = `rgba(5, 10, 20, ${1 - this.depth * 0.5})`;
+                ctx.fillRect(drawX - drawWidth/2, drawY, drawWidth, drawHeight);
+
+                // Neon Outline
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.3 * (1 - this.depth);
+                ctx.strokeRect(drawX - drawWidth/2, drawY, drawWidth, drawHeight);
+                ctx.globalAlpha = 1.0;
+
+                // Windows
+                const winW = (drawWidth / 6);
+                const winH = (drawHeight / 20);
+                const padding = winW * 0.5;
+
+                for (let win of this.windows) {
+                    if (win.lit) {
+                        const wx = (drawX - drawWidth/2) + padding + win.c * (winW + padding);
+                        const wy = drawY + padding + win.r * (winH + padding);
+                        
+                        // Only draw if within current height
+                        if (wy > drawY && wy < height - 10) {
+                            ctx.fillStyle = this.color;
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = this.color;
+                            ctx.globalAlpha = 0.5 + Math.sin(Date.now() * win.blinkSpeed) * 0.3;
+                            ctx.fillRect(wx, wy, winW, winH);
+                        }
+                    }
+                }
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        class TrafficLine {
+            constructor() {
+                this.y = height - 10 - Math.random() * 40;
+                this.x = Math.random() * width;
+                this.speed = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 8);
+                this.length = 20 + Math.random() * 50;
+                this.color = this.speed > 0 ? '#ff0055' : '#ffffff';
+            }
+            update() {
+                this.x += this.speed;
+                if (this.x > width + 100) this.x = -100;
+                if (this.x < -100) this.x = width + 100;
+            }
+            draw() {
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x + this.length, this.y);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // Initial setup
+        for(let i=0; i<15; i++) traffic.push(new TrafficLine());
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'A') return;
+            // Create a building with depth based on where we clicked (or random)
+            const depth = Math.random();
+            buildings.push(new Building(e.clientX, depth));
+            // Sort by depth so back ones draw first
+            buildings.sort((a, b) => b.depth - a.depth);
+        });
+
+        function animate() {
+            // Dark night sky gradient
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, '#020408');
+            grad.addColorStop(1, '#0a0e1a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Stars
+            ctx.fillStyle = "#fff";
+            for(let i=0; i<5; i++) {
+                ctx.globalAlpha = Math.random() * 0.5;
+                ctx.fillRect(Math.random() * width, Math.random() * (height*0.7), 1, 1);
+            }
+            ctx.globalAlpha = 1.0;
+
+            for (let t of traffic) {
+                t.update();
+                t.draw();
+            }
+
+            for (let b of buildings) {
+                b.update();
+                b.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

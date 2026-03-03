@@ -1,23 +1,23 @@
-# Chaos Pendulum Painter 🧬🎨
+# AI 콜라보 프로젝트 (AI Collabo) 🤖✨
 
-A beautiful, interactive double pendulum simulation that paints chaotic, artistic trails. Built with Vanilla JS and Canvas API.
+AI와 인간의 협업으로 만들어진 창의적이고 무작위적인 실험작들의 모음입니다.
 
-## ✨ Features
-- **Conservative Physics**: Zero damping/friction for perpetual motion.
-- **Vivid Paint Engine**: Particles inherit momentum from the pendulum tip.
-- **Multi-Drag System**: You can grab and toss both the middle and end joints.
-- **Ghost Decay**: Older trails slowly fade away over a long period, like ancient murals.
-- **Responsive Design**: Works on desktop and mobile browsers.
+## 🚀 포함된 프로젝트
 
-## 🕹 Controls
-- **Drag & Toss**: Click and drag any of the two joints to add energy to the system.
-- **Clear Canvas**: Reset the painting and start over.
-- **Randomize**: Start with a new random physical state and color.
+### 1. 카오스 페인터 (Chaos Painter) 🧬🎨
+이중 진자의 물리 법칙을 이용한 시뮬레이션 페인터입니다.
+- **특징**: 에너지 보존 법칙(무감쇠) 적용, 관성에 따른 물감 튀기기 효과, 슬로우 모션 모드.
+- **조작**: 관절을 마우스로 드래그하여 에너지를 주거나 던질 수 있습니다.
 
-## 🛠 Tech Stack
-- HTML5 Canvas
-- JavaScript (Vanilla)
-- Lagrange Mechanics (Double Pendulum Equations)
+### 2. 미생물 배양기 (Microbe Colony) 🧪🧫
+유기적인 움직임과 메타볼 시각화가 특징인 가상 세포 배양 시뮬레이션입니다.
+- **특징**: 자가 번식(분열), 에너지 대사, 메타볼 효과를 이용한 끈적한 유기적 그래픽.
+- **조작**: 화면을 클릭하여 영양분을 공급해 군집을 키울 수 있습니다.
 
-## 🎨 Aesthetic
-Premium dark mode interface with neon-style gradients and smooth animations.
+## 🛠 기술 스택
+- HTML5 Canvas API
+- Vanilla JavaScript (순수 자바스크립트)
+- 물리 엔진 (라그랑주 역학, 벡터 물리)
+
+## 🌐 바로가기
+[GitHub Pages 링크](https://jugwangjin.github.io/ai_collabo/)에서 직접 체험해 보세요!

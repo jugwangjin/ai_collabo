@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미생물 배양기 - 다양성 에디션</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050a10;
+            font-family: 'Pretendard', 'Segoe UI', system-ui, sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            filter: blur(12px) contrast(25);
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 400; color: #00ffcc; }
+        p { margin: 5px 0 0; font-size: 12px; opacity: 0.6; }
+        .stats { margin-top: 10px; font-family: monospace; font-size: 11px; color: #f1c40f; line-height: 1.4; }
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #fff;
+            text-decoration: none;
+            font-size: 12px;
+            opacity: 0.5;
+            padding: 8px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+        }
+        #back-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← 포털로 돌아가기</a>
+    <div class="ui">
+        <h1>미생물 배양기</h1>
+        <p>다양성 & 자동 생존 시스템</p>
+        <div class="stats" id="stats">개체 수: 0<br>총 에너지: 0</div>
+    </div>
+    <div class="hint">멸종 위기 시 새로운 종이 자연 발생합니다</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statsEl = document.getElementById('stats');
+
+        let width, height;
+        let cells = [];
+        let nutrients = [];
+        const MAX_CELLS = 100;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const SPECIES_TYPES = [
+            { name: '공생종', hue: 180, speed: 1.0, sense: 200, metabolism: 0.995, size: 20 },
+            { name: '포식종', hue: 0, speed: 1.8, sense: 300, metabolism: 0.985, size: 15 },
+            { name: '거대종', hue: 280, speed: 0.6, sense: 150, metabolism: 0.997, size: 35 },
+            { name: '효율종', hue: 100, speed: 0.8, sense: 120, metabolism: 0.998, size: 18 }
+        ];
+
+        class Nutrient {
+            constructor(x, y) {
+                this.x = x || Math.random() * width;
+                this.y = y || Math.random() * height;
+                this.energy = 30 + Math.random() * 40;
+                this.radius = 4;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1c40f';
+                ctx.fill();
+            }
+        }
+
+        class Cell {
+            constructor(x, y, typeIndex, dnaOverride) {
+                const type = SPECIES_TYPES[typeIndex || Math.floor(Math.random() * SPECIES_TYPES.length)];
+                this.typeIndex = typeIndex !== undefined ? typeIndex : Math.floor(Math.random() * SPECIES_TYPES.length);
+                this.x = x || Math.random() * width;
+                this.y = y || Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                
+                this.dna = dnaOverride || {
+                    speed: type.speed * (0.9 + Math.random() * 0.2),
+                    sense: type.sense * (0.9 + Math.random() * 0.2),
+                    hue: type.hue + (Math.random() - 0.5) * 20,
+                    metabolism: type.metabolism,
+                    size: type.size * (0.9 + Math.random() * 0.2)
+                };
+                
+                this.energy = 100;
+                this.pulse = Math.random() * Math.PI * 2;
+            }
+
+            update() {
+                this.energy *= this.dna.metabolism;
+                this.pulse += 0.05;
+
+                let target = null;
+                let minDist = this.dna.sense;
+
+                for (let n of nutrients) {
+                    let d = Math.hypot(this.x - n.x, this.y - n.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        target = n;
+                    }
+                }
+
+                if (target) {
+                    let angle = Math.atan2(target.y - this.y, target.x - this.x);
+                    this.vx += Math.cos(angle) * 0.15 * this.dna.speed;
+                    this.vy += Math.sin(angle) * 0.15 * this.dna.speed;
+
+                    if (minDist < this.dna.size) {
+                        this.energy += target.energy;
+                        nutrients.splice(nutrients.indexOf(target), 1);
+                    }
+                } else {
+                    this.vx += (Math.random() - 0.5) * 0.3;
+                    this.vy += (Math.random() - 0.5) * 0.3;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= 0.94;
+                this.vy *= 0.94;
+
+                // Boundary Wrap
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+
+                if (this.energy > 250 && cells.length < MAX_CELLS) this.split();
+            }
+
+            split() {
+                this.energy *= 0.45;
+                const child = new Cell(this.x, this.y, this.typeIndex, {
+                    ...this.dna,
+                    hue: this.dna.hue + (Math.random() - 0.5) * 5,
+                    speed: this.dna.speed * (0.98 + Math.random() * 0.04)
+                });
+                cells.push(child);
+            }
+
+            draw() {
+                const s = Math.sin(this.pulse) * (this.dna.size * 0.15);
+                const r = this.dna.size + s;
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${this.dna.hue}, 80%, 50%)`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fill();
+            }
+        }
+
+        // Initial Pop
+        for (let i = 0; i < 8; i++) cells.push(new Cell());
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'A') return;
+            for(let i=0; i<8; i++) {
+                nutrients.push(new Nutrient(
+                    e.clientX + (Math.random()-0.5)*80, 
+                    e.clientY + (Math.random()-0.5)*80
+                ));
+            }
+        });
+
+        function animate() {
+            ctx.fillStyle = 'rgba(5, 10, 16, 0.6)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Frequent Auto-Nutrients
+            if (Math.random() < 0.15) nutrients.push(new Nutrient());
+
+            // Spontaneous Generation if population is low
+            if (cells.length < 3 && Math.random() < 0.02) {
+                cells.push(new Cell());
+            }
+
+            for (let n of nutrients) n.draw();
+
+            cells = cells.filter(c => c.energy > 15);
+            for (let c of cells) {
+                c.update();
+                c.draw();
+            }
+
+            statsEl.innerHTML = `개체 수: ${cells.length}<br>총 에너지: ${Math.floor(cells.reduce((a, b) => a + b.energy, 0))}`;
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>

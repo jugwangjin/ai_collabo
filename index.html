@@ -3,282 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chaos Pendulum Painter - Colorful Edition</title>
+    <title>AI랑 만든 쓰레기 모음</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden;
             background-color: #050505;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            user-select: none;
+            color: #fff;
+            font-family: 'Pretendard', 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        canvas {
-            display: block;
-        }
-        .controls {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            pointer-events: auto;
-            transition: opacity 0.3s;
-            z-index: 100;
-        }
-        .controls:hover {
-            background: rgba(255, 255, 255, 0.1);
+        canvas#bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.3;
         }
         h1 {
-            margin: 0 0 10px 0;
-            font-size: 18px;
-            font-weight: 300;
-            letter-spacing: 1px;
+            font-size: 3rem;
+            font-weight: 200;
+            letter-spacing: 0.2rem;
+            margin-bottom: 3rem;
             color: #00ffcc;
-        }
-        p {
-            margin: 5px 0;
-            font-size: 12px;
-            opacity: 0.7;
-        }
-        .btn {
-            background: #00ffcc;
-            color: black;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-top: 10px;
-            width: 100%;
-            transition: transform 0.1s;
-        }
-        .btn:active {
-            transform: scale(0.95);
-        }
-        .hint {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
+            text-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
             text-align: center;
-            font-size: 14px;
-            opacity: 0.5;
-            pointer-events: none;
+            word-break: keep-all;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 1000px;
+            width: 90%;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 24px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        .card:hover {
+            transform: translateY(-10px) scale(1.03);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00ffcc;
+            box-shadow: 0 10px 30px rgba(0, 255, 204, 0.2);
+        }
+        .card h2 {
+            margin: 0 0 0.8rem 0;
+            font-weight: 500;
+            color: #fff;
+            font-size: 1.3rem;
+        }
+        .card p {
+            margin: 0;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            line-height: 1.5;
+            word-break: keep-all;
+        }
+        .emoji {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 1rem;
         }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <h1>Chaos Painter</h1>
-        <p>Colorful Edition (Fast Color Change)</p>
-        <button class="btn" onclick="resetCanvas()">Clear Canvas</button>
-        <button class="btn" onclick="randomize()">Randomize</button>
+    <canvas id="bg"></canvas>
+    <h1>AI랑 만든 쓰레기 모음</h1>
+    <div class="container">
+        <a href="./chaos_pendulum/index.html" class="card">
+            <span class="emoji">🎨</span>
+            <h2>카오스 페인터</h2>
+            <p>이중 진자의 물리 법칙을 이용해 예측 불가능한 예술적 궤적을 그립니다.</p>
+        </a>
+        <a href="./microbe_colony/index.html" class="card">
+            <span class="emoji">🧪</span>
+            <h2>미생물 배양기</h2>
+            <p>다양한 종의 미생물들이 번식하고 진화하는 유기적 시뮬레이션입니다.</p>
+        </a>
+        <a href="./neon_city/index.html" class="card">
+            <span class="emoji">🏙️</span>
+            <h2>절차적 도시의 밤</h2>
+            <p>클릭할 때마다 솟아오르는 빌딩으로 화려한 네온 야경을 만듭니다.</p>
+        </a>
     </div>
-    <div class="hint">Fast colors, elegant chaos.</div>
-    <canvas id="canvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('canvas');
+        const canvas = document.getElementById('bg');
         const ctx = canvas.getContext('2d');
-        const paintCanvas = document.createElement('canvas');
-        const paintCtx = paintCanvas.getContext('2d');
-
         let width, height;
-        let r1 = 160, r2 = 160; 
-        let m1 = 40, m2 = 40; 
-        let a1 = Math.PI / 2, a2 = Math.PI / 2; 
-        let a1_v = 0, a2_v = 0; 
-        let g = 0.2; 
-        let hue = 0;
-        
-        let dragTarget = null; 
-        let x1, y1, x2, y2; 
-        let particles = [];
-        const speedFactor = 0.1125;
+        const dots = [];
 
         function resize() {
             width = window.innerWidth;
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
-            paintCanvas.width = width;
-            paintCanvas.height = height;
-            resetCanvas();
         }
-
         window.addEventListener('resize', resize);
         resize();
 
-        function resetCanvas() {
-            paintCtx.fillStyle = '#050505';
-            paintCtx.fillRect(0, 0, width, height);
-            particles = [];
-        }
-
-        function randomize() {
-            a1 = Math.random() * Math.PI * 2;
-            a2 = Math.random() * Math.PI * 2;
-            a1_v = (Math.random() - 0.5) * 0.15;
-            a2_v = (Math.random() - 0.5) * 0.15;
-            hue = Math.random() * 360;
-        }
-
-        class Particle {
-            constructor(x, y, vx, vy, color) {
-                this.x = x;
-                this.y = y;
-                const spread = 0.45;
-                this.vx = vx + (Math.random() - 0.5) * spread;
-                this.vy = vy + (Math.random() - 0.5) * spread;
-                this.size = Math.random() * 2.8 + 0.6;
-                this.color = color;
-                this.life = 1.0;
-                this.decay = Math.random() * 0.0064 + 0.0042;
-            }
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vy += 0.025; 
-                this.vx *= 0.985; 
-                this.life -= this.decay;
-                if (this.life > 0) {
-                    paintCtx.globalAlpha = this.life * 0.35;
-                    paintCtx.fillStyle = this.color;
-                    paintCtx.beginPath();
-                    paintCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    paintCtx.fill();
-                }
-            }
-        }
-
-        function handleStart(e) {
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            const d1 = Math.hypot(clientX - x1, clientY - y1);
-            const d2 = Math.hypot(clientX - x2, clientY - y2);
-            if (d1 < 30) dragTarget = 1;
-            else if (d2 < 30) dragTarget = 2;
-            else dragTarget = null;
-        }
-
-        function handleMove(e) {
-            if (dragTarget) {
-                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-                const cx = width / 2;
-                const cy = height * 0.35;
-                if (dragTarget === 1) {
-                    a1 = Math.atan2(clientX - cx, clientY - cy);
-                    a1_v = 0;
-                } else if (dragTarget === 2) {
-                    a1 = Math.atan2(clientX - cx, clientY - cy);
-                    const dx = clientX - x1;
-                    const dy = clientY - y1;
-                    a2 = Math.atan2(dx, dy);
-                    a2_v = 0;
-                }
-            }
-        }
-
-        function handleEnd() { dragTarget = null; }
-
-        canvas.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); });
-        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); });
-        window.addEventListener('touchend', handleEnd);
-
-        function draw() {
-            paintCtx.globalAlpha = 0.0003; 
-            paintCtx.fillStyle = '#050505';
-            paintCtx.fillRect(0, 0, width, height);
-            paintCtx.globalAlpha = 1.0;
-
-            const substeps = 4;
-            for (let i = 0; i < substeps; i++) {
-                if (!dragTarget) {
-                    let num1 = -g * (2 * m1 + m2) * Math.sin(a1);
-                    let num2 = -m2 * g * Math.sin(a1 - 2 * a2);
-                    let num3 = -2 * Math.sin(a1 - a2) * m2;
-                    let num4 = a2_v * a2_v * r2 + a1_v * a1_v * r1 * Math.cos(a1 - a2);
-                    let den = r1 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
-                    let a1_a = (num1 + num2 + num3 * num4) / den;
-
-                    num1 = 2 * Math.sin(a1 - a2);
-                    num2 = (a1_v * a1_v * r1 * (m1 + m2));
-                    num3 = g * (m1 + m2) * Math.cos(a1);
-                    num4 = a2_v * a2_v * r2 * m2 * Math.cos(a1 - a2);
-                    den = r2 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
-                    let a2_a = (num1 * (num2 + num3 + num4)) / den;
-
-                    a1_v += a1_a * speedFactor;
-                    a2_v += a2_a * speedFactor;
-                    a1 += a1_v * speedFactor;
-                    a2 += a2_v * speedFactor;
-                    a1_v *= 1.0; a2_v *= 1.0;
-                } else if (dragTarget === 1) {
-                    let a2_a = -g/r2 * Math.sin(a2);
-                    a2_v += a2_a * speedFactor;
-                    a2 += a2_v * speedFactor;
-                }
-            }
-
-            const cx = width / 2;
-            const cy = height * 0.35;
-            x1 = cx + r1 * Math.sin(a1);
-            y1 = cy + r1 * Math.cos(a1);
-            x2 = x1 + r2 * Math.sin(a2);
-            y2 = y1 + r2 * Math.cos(a2);
-
-            const vx2 = r1 * Math.cos(a1) * a1_v + r2 * Math.cos(a2) * a2_v;
-            const vy2 = -r1 * Math.sin(a1) * a1_v - r2 * Math.sin(a2) * a2_v;
-
-            if (!dragTarget) {
-                const velMag = Math.sqrt(vx2 * vx2 + vy2 * vy2);
-                if (Math.random() < 0.6) { 
-                    const particleCount = Math.floor(velMag * 1.0) + 1;
-                    const color = `hsl(${hue}, 100%, 65%)`;
-                    for (let i = 0; i < particleCount; i++) {
-                        particles.push(new Particle(x2, y2, vx2 * 0.44, vy2 * 0.44, color));
-                    }
-                }
-            }
-
-            particles = particles.filter(p => {
-                p.update();
-                return p.life > 0;
+        for (let i = 0; i < 60; i++) {
+            dots.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: (Math.random() - 0.5) * 0.4,
+                vy: (Math.random() - 0.5) * 0.4
             });
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.drawImage(paintCanvas, 0, 0);
-
-            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.shadowBlur = dragTarget ? 20 : 10;
-            ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.lineWidth = 6;
-            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-            ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
-            if (dragTarget === 1) { ctx.shadowBlur = 15; ctx.shadowColor = '#00ffcc'; ctx.fillStyle = '#00ffcc'; }
-            else ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(x1, y1, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-            ctx.shadowBlur = (dragTarget === 2) ? 25 : 15;
-            ctx.fillStyle = `hsl(${hue}, 100%, 65%)`; ctx.shadowColor = `hsl(${hue}, 100%, 65%)`;
-            ctx.beginPath(); ctx.arc(x2, y2, 14, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
-
-            // Hue change speed increased (0.15 -> 0.6)
-            hue += 0.6;
-            requestAnimationFrame(draw);
         }
-        draw();
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#00ffcc';
+            for (let dot of dots) {
+                dot.x = (dot.x + dot.vx + width) % width;
+                dot.y = (dot.y + dot.vy + height) % height;
+                ctx.beginPath();
+                ctx.arc(dot.x, dot.y, 1.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
     </script>
 </body>
 </html>
