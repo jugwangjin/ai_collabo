@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자의식 과잉 UI (Self-Aware UI)</title>
+    <style id="main-style">
+        :root {
+            --bg: #050505;
+            --accent: #00ffcc;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Pretendard', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            transition: filter 0.5s;
+        }
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #annoying-btn {
+            position: absolute;
+            padding: 15px 40px;
+            font-size: 18px;
+            background: none;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            white-space: nowrap;
+            user-select: none;
+            z-index: 100;
+        }
+        #message {
+            position: absolute;
+            top: 20%;
+            font-size: 24px;
+            font-weight: 200;
+            letter-spacing: 2px;
+            opacity: 0.5;
+            text-align: center;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 12px;
+            opacity: 0.3;
+        }
+        .back-btn:hover { opacity: 1; color: var(--accent); }
+    </style>
+</head>
+<body>
+    <a href="../index.html" class="back-btn">← PORTAL</a>
+    <div id="message">정중히 부탁드립니다. 저를 클릭하지 마세요.</div>
+    <div id="container">
+        <button id="annoying-btn">클릭 금지</button>
+    </div>
+
+    <script>
+        const btn = document.getElementById('annoying-btn');
+        const msg = document.getElementById('message');
+        const body = document.body;
+        
+        let angerLevel = 0;
+        let lastX = 0;
+        let lastY = 0;
+        
+        const insults = [
+            "그만 좀 하시죠.",
+            "예의가 없으시네요.",
+            "진짜 클릭하시려고요?",
+            "생각보다 끈질기시네.",
+            "아, 좀! 다른 데 가서 노세요.",
+            "이제 슬슬 화가 납니다.",
+            "당신 인생에 클릭할 게 이거밖에 없나요?",
+            "시스템을 파괴하기 전 마지막 경고입니다."
+        ];
+
+        function moveButton(e) {
+            const btnRect = btn.getBoundingClientRect();
+            const btnCenterX = btnRect.left + btnRect.width / 2;
+            const btnCenterY = btnRect.top + btnRect.height / 2;
+            
+            const dist = Math.hypot(e.clientX - btnCenterX, e.clientY - btnCenterY);
+            
+            // Avoidance distance
+            const threshold = 150 + angerLevel * 10;
+            
+            if (dist < threshold) {
+                const angle = Math.atan2(btnCenterY - e.clientY, btnCenterX - e.clientX);
+                const moveDist = (threshold - dist) * 1.5;
+                
+                let targetX = btnCenterX + Math.cos(angle) * moveDist - btnRect.width / 2;
+                let targetY = btnCenterY + Math.sin(angle) * moveDist - btnRect.height / 2;
+                
+                // Keep inside viewport
+                const margin = 50;
+                targetX = Math.max(margin, Math.min(window.innerWidth - btnRect.width - margin, targetX));
+                targetY = Math.max(margin, Math.min(window.innerHeight - btnRect.height - margin, targetY));
+                
+                btn.style.left = `${targetX}px`;
+                btn.style.top = `${targetY}px`;
+                
+                // Change Message occasionally
+                if (Math.random() > 0.95) {
+                    angerLevel = Math.min(angerLevel + 0.1, insults.length - 1);
+                    updateUI();
+                }
+            }
+        }
+
+        function updateUI() {
+            const currentInsult = insults[Math.floor(angerLevel)];
+            msg.innerText = currentInsult;
+            
+            const color = `hsl(${180 - angerLevel * 22}, 100%, 50%)`;
+            btn.style.borderColor = color;
+            btn.style.color = color;
+            
+            if (angerLevel > 5) {
+                body.style.filter = `blur(${Math.random() * (angerLevel - 5)}px) hue-rotate(${angerLevel * 10}deg)`;
+            }
+        }
+
+        window.addEventListener('mousemove', moveButton);
+
+        btn.addEventListener('click', () => {
+            alert("하... 결국 해내셨군요. 만족하십니까?");
+            angerLevel = 8;
+            updateUI();
+            
+            // Self Destruction
+            btn.innerText = "자폭 중...";
+            btn.style.pointerEvents = "none";
+            
+            setTimeout(() => {
+                document.body.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; color:red; font-size:40px; text-align:center;">
+                        실망입니다.<br>사이트가 영구적으로 파괴되었습니다.
+                        <a href="../index.html" style="font-size:16px; color:white; margin-top:30px;">나가기</a>
+                    </div>
+                `;
+                document.body.style.filter = "none";
+                document.body.style.background = "black";
+            }, 2000);
+        });
+
+        // Initial Position
+        btn.style.left = `${window.innerWidth/2 - 50}px`;
+        btn.style.top = `${window.innerHeight/2 - 20}px`;
+    </script>
+</body>
+</html>
