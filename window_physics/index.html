@@ -3,30 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>윈도우 슬라임 물리 - WINDOW SLIME PHYSICS</title>
+    <title>윈도우 유체 시뮬레이터 - SPH FLUID PHYSICS</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #050505;
-            color: #00ffcc;
+            background-color: #020205;
+            color: #4488ff;
             font-family: 'Courier New', Courier, monospace;
             user-select: none;
         }
         canvas {
             display: block;
-            /* Metaball effect filter */
-            filter: blur(12px) contrast(25);
         }
         .ui {
             position: absolute;
             top: 20px;
             left: 20px;
             z-index: 100;
-            background: rgba(0, 255, 204, 0.05);
+            background: rgba(68, 136, 255, 0.05);
             padding: 15px;
-            border: 1px solid #00ffcc;
+            border: 1px solid #4488ff;
             pointer-events: none;
             backdrop-filter: blur(5px);
         }
@@ -37,11 +35,11 @@
             top: 20px;
             right: 20px;
             z-index: 101;
-            color: #00ffcc;
+            color: #4488ff;
             text-decoration: none;
             font-size: 10px;
             padding: 5px 10px;
-            border: 1px solid #00ffcc;
+            border: 1px solid #4488ff;
             pointer-events: auto;
         }
     </style>
@@ -49,10 +47,10 @@
 <body>
     <a href="../index.html" id="back-btn">← SYSTEM EXIT</a>
     <div class="ui">
-        <h1>WINDOW SLIME v1.0</h1>
+        <h1>SPH FLUID ENGINE v3.0</h1>
         <div class="data" id="debug">
-            INERTIA: 0.0<br>
-            PRESSURE: 0.0
+            PARTICLES: 0<br>
+            STABILITY: 100%
         </div>
     </div>
     <canvas id="canvas"></canvas>
@@ -65,10 +63,16 @@
         let width, height;
         let particles = [];
         
+        // SPH Constants
+        const H = 35;           // Smoothing radius
+        const GAS_CONST = 2500; // Pressure constant
+        const RHO0 = 1.0;       // Rest density
+        const VISC = 250;       // Viscosity constant
+        const MASS = 1.0;       // Particle mass
+        const DT = 0.8;         // Time step
+
         let lastWinX = window.screenX;
         let lastWinY = window.screenY;
-        let lastWinW = window.innerWidth;
-        let lastWinH = window.innerHeight;
 
         function resize() {
             width = window.innerWidth;
@@ -79,87 +83,128 @@
 
         class Particle {
             constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.vx = 0;
-                this.vy = 0;
-                this.radius = Math.random() * 15 + 20;
-            }
-
-            update(winVX, winVY, pressure) {
-                // Apply inertia from window move
-                this.vx -= winVX * 0.6;
-                this.vy -= winVY * 0.6;
-
-                // Random jitter from pressure
-                this.vx += (Math.random() - 0.5) * pressure * 10;
-                this.vy += (Math.random() - 0.5) * pressure * 10;
-
-                // Movement
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Friction / Viscosity
-                this.vx *= 0.92;
-                this.vy *= 0.92;
-
-                // Gentle return to center (gravity-like)
-                this.vx += (width/2 - this.x) * 0.001;
-                this.vy += (height/2 - this.y) * 0.001;
-
-                // Wall Collisions
-                const pad = this.radius;
-                if (this.x < pad) { this.x = pad; this.vx *= -0.5; }
-                if (this.x > width - pad) { this.x = width - pad; this.vx *= -0.5; }
-                if (this.y < pad) { this.y = pad; this.vy *= -0.5; }
-                if (this.y > height - pad) { this.y = height - pad; this.vy *= -0.5; }
-            }
-
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#00ffcc';
-                ctx.fill();
+                this.x = x; this.y = y;
+                this.vx = 0; this.vy = 0;
+                this.fx = 0; this.fy = 0;
+                this.rho = 0; this.p = 0;
             }
         }
 
         function init() {
             resize();
             particles = [];
-            for (let i = 0; i < 25; i++) {
+            const rowLen = 12;
+            const startX = width / 2 - (rowLen * H * 0.4) / 2;
+            const startY = height / 2 - (rowLen * H * 0.4) / 2;
+            
+            for (let i = 0; i < 150; i++) {
                 particles.push(new Particle(
-                    width/2 + (Math.random()-0.5)*100,
-                    height/2 + (Math.random()-0.5)*100
+                    startX + (i % rowLen) * H * 0.6,
+                    startY + Math.floor(i / rowLen) * H * 0.6
                 ));
             }
         }
 
-        window.addEventListener('resize', resize);
+        function computeDensityPressure() {
+            for (let p1 of particles) {
+                p1.rho = 0;
+                for (let p2 of particles) {
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < H * H) {
+                        p1.rho += MASS * (315 / (64 * Math.PI * Math.pow(H, 9))) * Math.pow(H * H - d2, 3);
+                    }
+                }
+                p1.p = GAS_CONST * (p1.rho - RHO0);
+            }
+        }
+
+        function computeForces(winVX, winVY) {
+            for (let p1 of particles) {
+                let fpressX = 0, fpressY = 0;
+                let fviscX = 0, fviscY = 0;
+
+                for (let p2 of particles) {
+                    if (p1 === p2) continue;
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+
+                    if (d < H) {
+                        // Pressure force
+                        const fp = -MASS * (p1.p + p2.p) / (2 * p2.rho) * (-45 / (Math.PI * Math.pow(H, 6))) * Math.pow(H - d, 2);
+                        fpressX += fp * dx / d;
+                        fpressY += fp * dy / d;
+
+                        // Viscosity force
+                        const fv = VISC * MASS * (45 / (Math.PI * Math.pow(H, 6))) * (H - d);
+                        fviscX += fv * (p2.vx - p1.vx) / p2.rho;
+                        fviscY += fv * (p2.vy - p1.vy) / p2.rho;
+                    }
+                }
+
+                // External force (Window Inertia)
+                const fextX = -winVX * 0.5;
+                const fextY = -winVY * 0.5;
+
+                // Wall Forces (Simple penalty method)
+                const wallK = 500;
+                const pad = 10;
+                if (p1.x < pad) p1.fx += (pad - p1.x) * wallK;
+                if (p1.x > width - pad) p1.fx += (width - pad - p1.x) * wallK;
+                if (p1.y < pad) p1.fy += (pad - p1.y) * wallK;
+                if (p1.y > height - pad) p1.fy += (height - pad - p1.y) * wallK;
+
+                p1.fx = fpressX + fviscX + fextX;
+                p1.fy = fpressY + fviscY + fextY;
+            }
+        }
+
+        function integrate() {
+            for (let p of particles) {
+                p.vx += DT * p.fx / p.rho;
+                p.vy += DT * p.fy / p.rho;
+                p.x += DT * p.vx;
+                p.y += DT * p.vy;
+
+                // Bounce & Friction
+                if (p.x < 0) { p.x = 0; p.vx *= -0.3; }
+                if (p.x > width) { p.x = width; p.vx *= -0.3; }
+                if (p.y < 0) { p.y = 0; p.vy *= -0.3; }
+                if (p.y > height) { p.y = height; p.vy *= -0.3; }
+            }
+        }
 
         function animate() {
-            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#020205';
+            ctx.fillRect(0, 0, width, height);
 
-            // Window Logic
             const winVX = window.screenX - lastWinX;
             const winVY = window.screenY - lastWinY;
-            const winVW = window.innerWidth - lastWinW;
-            const winVH = window.innerHeight - lastWinH;
-            
-            const pressure = Math.abs(winVW) + Math.abs(winVH);
-            const inertia = Math.hypot(winVX, winVY);
-
             lastWinX = window.screenX;
             lastWinY = window.screenY;
-            lastWinW = window.innerWidth;
-            lastWinH = window.innerHeight;
 
-            debugEl.innerHTML = `INERTIA: ${inertia.toFixed(1)}<br>PRESSURE: ${pressure.toFixed(1)}`;
+            // Substepping for stability
+            const substeps = 2;
+            for(let i=0; i<substeps; i++) {
+                computeDensityPressure();
+                computeForces(winVX / substeps, winVY / substeps);
+                integrate();
+            }
 
-            particles.forEach(p => {
-                p.update(winVX, winVY, pressure);
-                p.draw();
-            });
+            // Rendering with glow
+            ctx.fillStyle = '#4488ff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#4488ff';
+            for (let p of particles) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
 
+            debugEl.innerHTML = `PARTICLES: ${particles.length}<br>WIN VEL: [${winVX}, ${winVY}]`;
             requestAnimationFrame(animate);
         }
 
