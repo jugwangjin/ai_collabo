@@ -135,6 +135,7 @@
         const VISCOSITY = 0.94;   
         const GRAVITY = 0.25;     
         const MAX_VEL = 20;
+        const INERTIA_GLOBAL = 0.12; // 은은한 글로벌 관성 (창 전체 영향)
 
         let lastWinX = null, lastWinY = null;
         let lastInnerW = window.innerWidth, lastInnerH = window.innerHeight;
@@ -175,6 +176,10 @@
             }
 
             update(dw, dh, wvx, wvy) {
+                // 글로벌 관성 (창 전체가 움직일 때 은은하게 영향)
+                this.vx -= wvx * INERTIA_GLOBAL;
+                this.vy -= wvy * INERTIA_GLOBAL;
+
                 this.vy += GRAVITY;
                 this.x += this.vx;
                 this.y += this.vy;
