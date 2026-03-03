@@ -65,13 +65,13 @@
         let width, height;
         let particles = [];
         
-        // Liquid Constants
+        // Liquid Constants - Tuned for lower viscosity (water-like)
         const RADIUS = 15;        
-        const STIFFNESS = 0.2;   
-        const VISCOSITY = 0.92;   
+        const STIFFNESS = 0.25;  // More bouncy
+        const VISCOSITY = 0.985; // Lower viscosity (closer to 1.0 means less friction)
         const GRAVITY = 0.25;     
         const INERTIA_SENSE = 0.2; 
-        const MAX_VEL = 20;
+        const MAX_VEL = 25;      // Higher speed limit for water
 
         let lastWinX = null, lastWinY = null;
         let lastInnerW = window.innerWidth, lastInnerH = window.innerHeight;
