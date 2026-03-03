@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기하학적 실뜨기 - 기하학 시뮬레이션</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050508;
+            font-family: 'Pretendard', sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 15px 20px;
+            border-radius: 16px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 300; color: #00e5ff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.4); }
+        p { margin: 5px 0 0; font-size: 11px; opacity: 0.5; letter-spacing: 1px; }
+        .hint {
+            position: absolute;
+            bottom: 25px;
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.3;
+            pointer-events: none;
+            letter-spacing: 2px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #fff;
+            text-decoration: none;
+            font-size: 11px;
+            opacity: 0.4;
+            padding: 8px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 30px;
+            transition: all 0.3s;
+        }
+        #back-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); border-color: #fff; }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← 포털로 돌아가기</a>
+    <div class="ui">
+        <h1>기하학적 실뜨기</h1>
+        <p>GEOMETRIC STRING ART</p>
+    </div>
+    <div class="hint">마우스로 점을 끌어당겨 선의 텐션을 느껴보세요</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let points = [];
+        let mouse = { x: -1000, y: -1000, active: false, target: null };
+        
+        const POINT_COUNT = 45;
+        const CONNECTION_DIST = 220;
+        const MOUSE_SENSE = 150;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * window.devicePixelRatio;
+            canvas.height = height * window.devicePixelRatio;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            initPoints();
+        }
+
+        class Point {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.8;
+                this.vy = (Math.random() - 0.5) * 0.8;
+                this.radius = 2.5;
+                this.baseHue = 190 + Math.random() * 40;
+                this.hue = this.baseHue;
+                this.isDragged = false;
+            }
+
+            update() {
+                if (!this.isDragged) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Bounce with soft padding
+                    if (this.x < 20 || this.x > width - 20) this.vx *= -1;
+                    if (this.y < 20 || this.y > height - 20) this.vy *= -1;
+                }
+
+                // Subtle hue animation
+                this.hue = this.baseHue + Math.sin(Date.now() * 0.002) * 20;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 70%)`;
+                if (this.isDragged) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = `hsl(${this.hue}, 100%, 70%)`;
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function initPoints() {
+            points = [];
+            for (let i = 0; i < POINT_COUNT; i++) {
+                points.push(new Point());
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            if (mouse.active && mouse.target) {
+                mouse.target.x = mouse.x;
+                mouse.target.y = mouse.y;
+            }
+        });
+
+        window.addEventListener('mousedown', () => {
+            mouse.active = true;
+            let minDist = 30;
+            points.forEach(p => {
+                let d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+                if (d < minDist) {
+                    minDist = d;
+                    mouse.target = p;
+                    p.isDragged = true;
+                }
+            });
+        });
+
+        window.addEventListener('mouseup', () => {
+            mouse.active = false;
+            if (mouse.target) {
+                mouse.target.isDragged = false;
+                mouse.target = null;
+            }
+        });
+
+        function drawConnections() {
+            ctx.lineWidth = 0.8;
+            for (let i = 0; i < points.length; i++) {
+                for (let j = i + 1; j < points.length; j++) {
+                    const p1 = points[i];
+                    const p2 = points[j];
+                    const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+                    if (d < CONNECTION_DIST) {
+                        const alpha = (1 - d / CONNECTION_DIST) * 0.45;
+                        const tension = p1.isDragged || p2.isDragged ? 0.8 : alpha;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        
+                        // Bezier curve if tension is high
+                        if (p1.isDragged || p2.isDragged) {
+                            ctx.strokeStyle = `hsla(${p1.hue}, 100%, 70%, ${tension})`;
+                            ctx.lineWidth = 1.2;
+                        } else {
+                            ctx.strokeStyle = `hsla(${p1.hue}, 100%, 70%, ${alpha})`;
+                            ctx.lineWidth = 0.6;
+                        }
+                        
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = '#050508';
+            ctx.fillRect(0, 0, width, height);
+
+            // Subtle background glow
+            const bgGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 400);
+            bgGrad.addColorStop(0, 'rgba(0, 229, 255, 0.05)');
+            bgGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            drawConnections();
+
+            points.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        resize();
+        animate();
+    </script>
+</body>
+</html>
