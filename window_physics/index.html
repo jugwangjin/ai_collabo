@@ -3,52 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>윈도우 유체 시뮬레이터 - STABLE FLUID v6.0</title>
+    <title>윈도우 유체 시뮬레이터 - LIQUID v7.0</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #020205;
-            color: #00d2ff;
+            background-color: #010103;
+            color: #00f0ff;
             font-family: 'Courier New', Courier, monospace;
             user-select: none;
         }
         canvas {
             display: block;
+            /* Liquid look: blur + contrast */
+            filter: blur(8px) contrast(20);
         }
         .ui {
             position: absolute;
             top: 20px;
             left: 20px;
             z-index: 100;
-            background: rgba(0, 210, 255, 0.05);
-            padding: 10px 15px;
-            border: 1px solid rgba(0, 210, 255, 0.3);
+            background: rgba(0, 240, 255, 0.05);
+            padding: 8px 12px;
+            border: 1px solid rgba(0, 240, 255, 0.3);
             pointer-events: none;
             backdrop-filter: blur(5px);
+            /* Reset filter for UI */
+            filter: none !important;
         }
-        h1 { margin: 0; font-size: 12px; letter-spacing: 1px; }
-        .data { margin-top: 5px; font-size: 10px; opacity: 0.6; }
+        h1 { margin: 0; font-size: 11px; letter-spacing: 1px; }
+        .data { margin-top: 4px; font-size: 9px; opacity: 0.6; }
         #back-btn {
             position: absolute;
             top: 20px;
             right: 20px;
             z-index: 101;
-            color: #00d2ff;
+            color: #00f0ff;
             text-decoration: none;
             font-size: 10px;
-            padding: 5px 12px;
-            border: 1px solid rgba(0, 210, 255, 0.2);
+            padding: 4px 10px;
+            border: 1px solid rgba(0, 240, 255, 0.2);
             border-radius: 20px;
+            filter: none !important;
         }
     </style>
 </head>
 <body>
     <a href="../index.html" id="back-btn">← EXIT</a>
     <div class="ui">
-        <h1>Stable Fluid Engine v6.0</h1>
-        <div class="data" id="debug">SYSTEM: CALIBRATING...</div>
+        <h1>Liquid Engine v7.0</h1>
+        <div class="data" id="debug">SYSTEM: ACTIVE</div>
     </div>
     <canvas id="canvas"></canvas>
 
@@ -60,15 +65,16 @@
         let width, height;
         let particles = [];
         
-        // Tuning for Stability & Feel
-        const RADIUS = 18;        // Interaction radius
-        const STIFFNESS = 0.15;   // Repulsion strength
-        const VISCOSITY = 0.94;   // Velocity damping (Higher = more honey-like)
-        const GRAVITY = 0.15;     // Constant downward force
-        const INERTIA_SENSE = 0.15; // How much window move affects fluid (0.0 to 1.0)
-        const MAX_VEL = 15;       // Speed limit to prevent "flashing"
+        // Liquid Constants
+        const RADIUS = 15;        
+        const STIFFNESS = 0.2;   
+        const VISCOSITY = 0.92;   
+        const GRAVITY = 0.25;     
+        const INERTIA_SENSE = 0.2; 
+        const MAX_VEL = 20;
 
         let lastWinX = null, lastWinY = null;
+        let lastInnerW = window.innerWidth, lastInnerH = window.innerHeight;
         let winVX = 0, winVY = 0;
 
         function resize() {
@@ -82,13 +88,14 @@
             constructor(x, y) {
                 this.x = x; this.y = y;
                 this.vx = 0; this.vy = 0;
+                this.radius = 12 + Math.random() * 4;
             }
 
-            update() {
-                // Apply constant forces
+            update(dw, dh) {
+                // Constant gravity
                 this.vy += GRAVITY;
                 
-                // Window inertia (Dampened)
+                // Window move inertia
                 this.vx -= winVX * INERTIA_SENSE;
                 this.vy -= winVY * INERTIA_SENSE;
 
@@ -96,9 +103,30 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Air friction / Viscosity
+                // Viscosity
                 this.vx *= VISCOSITY;
                 this.vy *= VISCOSITY;
+
+                // Wall Collisions with Dynamic Boundary Force
+                // When window shrinks (dw < 0), push particles inside
+                const pad = this.radius;
+                
+                if (this.x < pad) {
+                    this.x = pad;
+                    this.vx = Math.abs(this.vx) * 0.5 + (dw < 0 ? Math.abs(dw) * 0.5 : 0);
+                }
+                if (this.x > width - pad) {
+                    this.x = width - pad;
+                    this.vx = -Math.abs(this.vx) * 0.5 + (dw < 0 ? -Math.abs(dw) * 0.5 : 0);
+                }
+                if (this.y < pad) {
+                    this.y = pad;
+                    this.vy = Math.abs(this.vy) * 0.5 + (dh < 0 ? Math.abs(dh) * 0.5 : 0);
+                }
+                if (this.y > height - pad) {
+                    this.y = height - pad;
+                    this.vy = -Math.abs(this.vy) * 0.5 + (dh < 0 ? -Math.abs(dh) * 0.5 : 0);
+                }
 
                 // Speed Limit
                 const speed = Math.hypot(this.vx, this.vy);
@@ -106,51 +134,40 @@
                     this.vx = (this.vx / speed) * MAX_VEL;
                     this.vy = (this.vy / speed) * MAX_VEL;
                 }
-
-                // Wall Collisions
-                const pad = 10;
-                if (this.x < pad) { this.x = pad; this.vx *= -0.5; }
-                if (this.x > width - pad) { this.x = width - pad; this.vx *= -0.5; }
-                if (this.y < pad) { this.y = pad; this.vy *= -0.5; }
-                if (this.y > height - pad) { this.y = height - pad; this.vy *= -0.5; }
             }
         }
 
         function init() {
             resize();
             particles = [];
-            const cols = 20;
-            const rows = 12;
-            const spacing = RADIUS * 0.8;
-            const startX = width / 2 - (cols * spacing) / 2;
-            const startY = height / 2 - (rows * spacing) / 2;
-            
-            for (let i = 0; i < cols * rows; i++) {
+            const count = 450; // Increased particle count
+            for (let i = 0; i < count; i++) {
                 particles.push(new Particle(
-                    startX + (i % cols) * spacing,
-                    startY + Math.floor(i / cols) * spacing
+                    width/2 + (Math.random()-0.5) * 200,
+                    height/2 + (Math.random()-0.5) * 200
                 ));
             }
             lastWinX = window.screenX;
             lastWinY = window.screenY;
+            lastInnerW = window.innerWidth;
+            lastInnerH = window.innerHeight;
         }
 
         function resolveCollisions() {
-            // Simple but stable repulsion physics
             for (let i = 0; i < particles.length; i++) {
                 const p1 = particles[i];
                 for (let j = i + 1; j < particles.length; j++) {
                     const p2 = particles[j];
                     const dx = p2.x - p1.x;
                     const dy = p2.y - p1.y;
-                    const dist = Math.hypot(dx, dy);
+                    const distSq = dx * dx + dy * dy;
 
-                    if (dist < RADIUS) {
+                    if (distSq < RADIUS * RADIUS) {
+                        const dist = Math.sqrt(distSq) || 0.1;
                         const overlap = RADIUS - dist;
                         const nx = dx / dist;
                         const ny = dy / dist;
                         
-                        // Push away based on stiffness
                         const force = overlap * STIFFNESS;
                         p1.vx -= nx * force;
                         p1.vy -= ny * force;
@@ -161,44 +178,50 @@
             }
         }
 
-        window.addEventListener('resize', resize);
+        window.addEventListener('resize', () => {
+            // Resize event is handled in the animate loop to get deltas
+        });
 
         function animate() {
-            ctx.fillStyle = '#020205';
+            // Calculate Window deltas
+            const dw = window.innerWidth - lastInnerW;
+            const dh = window.innerHeight - lastInnerH;
+            resize(); // Update width/height to current innerSize
+            
+            ctx.fillStyle = '#010103';
             ctx.fillRect(0, 0, width, height);
 
             if (lastWinX !== null) {
-                // Smooth window velocity tracking
                 const curWinVX = window.screenX - lastWinX;
                 const curWinVY = window.screenY - lastWinY;
-                winVX = winVX * 0.8 + curWinVX * 0.2;
-                winVY = winVY * 0.8 + curWinVY * 0.2;
+                winVX = winVX * 0.7 + curWinVX * 0.3;
+                winVY = winVY * 0.7 + curWinVY * 0.3;
             }
+            
+            // Update reference values
             lastWinX = window.screenX;
             lastWinY = window.screenY;
+            lastInnerW = window.innerWidth;
+            lastInnerH = window.innerHeight;
 
-            // Physics steps
+            // Physics
             resolveCollisions();
-            particles.forEach(p => p.update());
+            particles.forEach(p => p.update(dw, dh));
 
             // Rendering
-            ctx.fillStyle = '#00d2ff';
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#00d2ff';
+            ctx.fillStyle = '#00f0ff';
             for (let p of particles) {
-                if (isNaN(p.x) || isNaN(p.y)) continue;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
-            ctx.shadowBlur = 0;
 
-            debugEl.innerText = `WIN VEL: [${winVX.toFixed(0)}, ${winVY.toFixed(0)}] | STATUS: STABLE`;
+            debugEl.innerText = `LIQUID PARTICLES: ${particles.length} | BW: ${dw.toFixed(0)}`;
             requestAnimationFrame(animate);
         }
 
-        init();
-        animate();
+            init();
+            animate();
     </script>
 </body>
 </html>
