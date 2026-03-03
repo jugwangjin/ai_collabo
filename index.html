@@ -90,6 +90,31 @@
             display: block;
             margin-bottom: 1.5rem;
         }
+        .discarded-title {
+            width: 90%;
+            max-width: 1100px;
+            font-size: 1.2rem;
+            font-weight: 300;
+            color: #666;
+            margin: 4rem 0 2rem 0;
+            text-align: left;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0.5rem;
+        }
+        .container.discarded {
+            opacity: 0.5;
+            filter: grayscale(1);
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+        .container.discarded .card {
+            padding: 1.5rem;
+            border-radius: 20px;
+        }
+        .container.discarded .card:hover {
+            filter: grayscale(0);
+            opacity: 1;
+            transform: translateY(-5px);
+        }
     </style>
 </head>
 <body>
@@ -123,10 +148,29 @@
             <h2>미생물 배양기</h2>
             <p>다양한 종의 미생물들이 번식하고 진화하는 유기적 시뮬레이션입니다.</p>
         </a>
+    </div>
+
+    <h2 class="discarded-title">* 별로라서 버려진 것들</h2>
+    <div class="container discarded">
+        <a href="./system_organism/index.html" class="card">
+            <span class="emoji">💻</span>
+            <h2>시스템 유기체</h2>
+            <p>컴퓨터 상태를 물리로 변환하려 했으나 뻔해서 버려짐.</p>
+        </a>
+        <a href="./self_aware_ui/index.html" class="card">
+            <span class="emoji">🗣️</span>
+            <h2>자의식 과잉 UI</h2>
+            <p>클릭을 피하는 버튼. 흔한 아이디어라 버려짐.</p>
+        </a>
+        <a href="./multi_window/index.html" class="card">
+            <span class="emoji">🌌</span>
+            <h2>멀티 윈도우 성단</h2>
+            <p>창들이 쫓아오는 물리 실험. 별로라서 버려짐.</p>
+        </a>
         <a href="./geometric_strings/index.html" class="card">
             <span class="emoji">🧶</span>
             <h2>기하학적 실뜨기</h2>
-            <p>점과 선의 연결이 만들어내는 몽환적인 기하학적 무늬와 물리적 텐션.</p>
+            <p>현대 미술인 척하려다 재미없어서 버려짐.</p>
         </a>
     </div>
 
