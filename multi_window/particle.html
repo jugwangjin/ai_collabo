@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>성단 입자</title>
+    <style>
+        body { margin: 0; background: #000; color: #00ffcc; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .center { width: 40px; height: 40px; border: 2px solid #00ffcc; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 255, 204, 0.5); }
+        .data { position: absolute; bottom: 10px; font-size: 8px; text-align: center; opacity: 0.6; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="center"></div>
+    <div class="data" id="pos">POS: 0, 0</div>
+
+    <script>
+        const posEl = document.getElementById('pos');
+        
+        function update() {
+            posEl.innerText = `X: ${window.screenX}\nY: ${window.screenY}`;
+            requestAnimationFrame(update);
+        }
+        update();
+    </script>
+</body>
+</html>

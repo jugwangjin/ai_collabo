@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>멀티 윈도우 성단 - HUB</title>
+    <style>
+        body { margin: 0; background: #050505; color: #00ffcc; font-family: 'Pretendard', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .ui { text-align: center; border: 1px solid #00ffcc; padding: 40px; border-radius: 20px; background: rgba(0, 255, 204, 0.05); backdrop-filter: blur(10px); }
+        h1 { font-size: 24px; font-weight: 200; letter-spacing: 5px; margin-bottom: 30px; }
+        .btn { background: none; border: 1px solid #00ffcc; color: #00ffcc; padding: 15px 30px; cursor: pointer; border-radius: 30px; transition: all 0.3s; font-size: 14px; }
+        .btn:hover { background: #00ffcc; color: black; box-shadow: 0 0 20px rgba(0, 255, 204, 0.4); }
+        p { margin-top: 20px; font-size: 10px; opacity: 0.5; }
+        #back-btn { position: absolute; top: 20px; right: 20px; color: #fff; text-decoration: none; font-size: 12px; opacity: 0.3; }
+    </style>
+</head>
+<body>
+    <a href="../index.html" id="back-btn">← EXIT</a>
+    <div class="ui">
+        <h1>MULTI-WINDOW<br>CONSTELLATION</h1>
+        <button class="btn" onclick="spawnParticles()">성단 입자 소환하기</button>
+        <p>* 브라우저 팝업 차단을 반드시 해제해 주세요!<br>메인 창을 잡고 휘두르면 동료 창들이 쫓아옵니다.</p>
+    </div>
+
+    <script>
+        const particles = [];
+        const channel = new BroadcastChannel('constellation');
+        
+        function spawnParticles() {
+            const count = 5;
+            for (let i = 0; i < count; i++) {
+                const win = window.open('particle.html', `p_${i}_${Date.now()}`, `width=150,height=150,left=${window.screenX + 200},top=${window.screenY + 200}`);
+                if (win) {
+                    particles.push({
+                        win: win,
+                        x: window.screenX + 200 + i * 50,
+                        y: window.screenY + 200 + i * 50,
+                        vx: 0,
+                        vy: 0
+                    });
+                }
+            }
+            animate();
+        }
+
+        function animate() {
+            const hubX = window.screenX + window.innerWidth / 2;
+            const hubY = window.screenY + window.innerHeight / 2;
+
+            particles.forEach((p, i) => {
+                if (p.win.closed) return;
+
+                // Physics: Spring tension towards HUB
+                const dx = hubX - (p.win.screenX + 75);
+                const dy = hubY - (p.win.screenY + 75);
+                const dist = Math.hypot(dx, dy);
+
+                // Spring force
+                const force = (dist - 250) * 0.005; 
+                p.vx += (dx / dist) * force;
+                p.vy += (dy / dist) * force;
+
+                // Inter-particle repulsion (Simple)
+                particles.forEach((p2, j) => {
+                    if (i === j || p2.win.closed) return;
+                    const rdx = p2.win.screenX - p.win.screenX;
+                    const rdy = p2.win.screenY - p.win.screenY;
+                    const rdist = Math.hypot(rdx, rdy);
+                    if (rdist < 180) {
+                        p.vx -= (rdx / rdist) * 0.5;
+                        p.vy -= (rdy / rdist) * 0.5;
+                    }
+                });
+
+                // Friction
+                p.vx *= 0.92;
+                p.vy *= 0.92;
+
+                // Apply to Window Position
+                p.x += p.vx;
+                p.y += p.vy;
+
+                try {
+                    p.win.moveTo(p.x, p.y);
+                } catch(e) {}
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Clean up on close
+        window.onbeforeunload = () => {
+            particles.forEach(p => p.win.close());
+        };
+    </script>
+</body>
+</html>
