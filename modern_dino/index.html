@@ -107,8 +107,9 @@
         // Constants
         const GROUND_Y_OFFSET = 20;
         const GRAVITY = 0.6;
-        const SPEED = 4.2;
-        const JITTER_AMOUNT = 2.5; // 지터 강도 대폭 강화
+        const WALK_SPEED = 1.8; // 걷기 속도 대폭 감속
+        const JUMP_SPEED = 4.5; // 점프 시 가로 이동 속도
+        const JITTER_AMOUNT = 2.5;
 
         // Game State
         let width, height;
@@ -119,7 +120,8 @@
             isJumping: false,
             state: 'walk', // walk, jump, end
             animFrame: 0,
-            currentLineWidth: 2.5
+            currentLineWidth: 2.5,
+            currentSpeed: 1.8
         };
         let jumpPressStartTime = 0;
         let isPressing = false;
@@ -154,6 +156,7 @@
             dino.state = 'walk';
             dino.animFrame = 0;
             dino.currentLineWidth = 2.5;
+            dino.currentSpeed = WALK_SPEED;
             trail = [{x: dino.x + 22, y: dino.y + 45, w: 2.5}];
             
             ui.classList.remove('visible');
@@ -174,13 +177,14 @@
         function update() {
             if (dino.state === 'end') return;
 
-            dino.x += SPEED;
+            dino.x += dino.currentSpeed;
             
             // 선 굵기 지터 (Smooth)
             dino.currentLineWidth += (Math.random() - 0.5) * 0.5;
             dino.currentLineWidth = Math.max(1.5, Math.min(4, dino.currentLineWidth));
 
             if (dino.isJumping) {
+                dino.currentSpeed = JUMP_SPEED;
                 dino.vy += GRAVITY;
                 // 점프 중 거친 지터 (1.5배)
                 dino.y += dino.vy + (Math.random() - 0.5) * JITTER_AMOUNT * 2.5;
@@ -191,6 +195,7 @@
                     endGame();
                 }
             } else {
+                dino.currentSpeed = WALK_SPEED;
                 // 평소 거친 지터
                 dino.y += (Math.random() - 0.5) * JITTER_AMOUNT;
                 dino.state = 'walk';
