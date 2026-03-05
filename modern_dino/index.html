@@ -66,12 +66,14 @@
 
     <div id="canvas-container">
         <canvas id="mainCanvas"></canvas>
-        <div class="instructions">SPACE TO JUMP (HOLD FOR HIGHER) | TOUCH SCREEN</div>
     </div>
 
     <div id="ui">
-        <button id="restartBtn">RESTART</button>
-        <button id="clearBtn">CLEAR CANVAS</button>
+        <div class="instructions">SPACE TO JUMP (HOLD FOR HIGHER) | TOUCH SCREEN</div>
+        <div style="display: flex; gap: 15px;">
+            <button id="restartBtn">RESTART</button>
+            <button id="clearBtn">CLEAR CANVAS</button>
+        </div>
     </div>
 
     <script>
@@ -87,12 +89,14 @@
             walk1: new Image(),
             walk2: new Image(),
             jump: new Image(),
-            end: new Image()
+            end: new Image(),
+            bg: new Image()
         };
         images.walk1.src = imgPath + 'walk_1.png';
         images.walk2.src = imgPath + 'walk_2.png';
         images.jump.src = imgPath + 'jump.png';
         images.end.src = imgPath + 'end.png';
+        images.bg.src = imgPath + 'canvas.png';
 
         const audio = {
             drumroll: new Audio(imgPath + 'drumroll.MP3'),
@@ -102,8 +106,8 @@
 
         // Constants
         const GROUND_Y_OFFSET = 20;
-        const GRAVITY = 0.5;
-        const SPEED = 3.5;
+        const GRAVITY = 0.6;
+        const SPEED = 4.2;
         const JITTER_AMOUNT = 0.8;
 
         // Game State
@@ -113,7 +117,6 @@
             y: 0,
             vy: 0,
             isJumping: false,
-            hasJumped: false,
             state: 'walk', // walk, jump, end
             animFrame: 0
         };
@@ -124,12 +127,11 @@
         let historyCtx;
 
         function init() {
-            width = window.innerWidth * 0.8;
-            height = 400;
+            width = Math.min(window.innerWidth * 0.9, 1000);
+            height = 500;
             canvas.width = width;
             canvas.height = height;
 
-            // Offscreen canvas for history (persisting trails)
             if (!historyCanvas) {
                 historyCanvas = document.createElement('canvas');
                 historyCanvas.width = width;
@@ -145,77 +147,72 @@
 
         function resetDino() {
             dino.x = 20;
-            dino.y = height - GROUND_Y_OFFSET - 40; // Approx dino height
+            dino.y = height - GROUND_Y_OFFSET - 47;
             dino.vy = 0;
             dino.isJumping = false;
-            dino.hasJumped = false;
             dino.state = 'walk';
             dino.animFrame = 0;
-            trail = [{x: dino.x + 20, y: dino.y + 40}];
+            trail = [{x: dino.x + 22, y: dino.y + 45}];
             
             ui.classList.remove('visible');
             audio.drumroll.currentTime = 0;
             audio.drumroll.play();
         }
 
-        function tick(timestamp) {
+        function tick() {
             update();
             draw();
             if (dino.state !== 'end') {
                 requestAnimationFrame(tick);
             } else {
-                showUI();
+                ui.classList.add('visible');
             }
         }
 
         function update() {
             if (dino.state === 'end') return;
 
-            // Horizontal Movement
             dino.x += SPEED;
             
-            // Vertical Jitter
-            let jitter = (Math.random() - 0.5) * JITTER_AMOUNT;
-            
-            // Physics
             if (dino.isJumping) {
                 dino.vy += GRAVITY;
                 dino.y += dino.vy;
                 dino.state = 'jump';
 
-                // Hit ground
-                if (dino.y >= height - GROUND_Y_OFFSET - 40) {
-                    dino.y = height - GROUND_Y_OFFSET - 40;
+                if (dino.y >= height - GROUND_Y_OFFSET - 47) {
+                    dino.y = height - GROUND_Y_OFFSET - 47;
                     endGame();
                 }
             } else {
-                dino.y += jitter;
+                dino.y += (Math.random() - 0.5) * JITTER_AMOUNT;
                 dino.state = 'walk';
                 dino.animFrame++;
             }
 
-            // Hit wall
-            if (dino.x > width - 40) {
-                dino.x = width - 40;
+            if (dino.x > width - 44) {
+                dino.x = width - 44;
                 endGame();
             }
 
-            // Record Trail (relative to dino's bottom center)
-            trail.push({x: dino.x + 20, y: dino.y + 38});
+            trail.push({x: dino.x + 22, y: dino.y + 45});
         }
 
         function draw() {
-            // 1. Clear Main Canvas
             ctx.clearRect(0, 0, width, height);
 
-            // 2. Draw History (Faded)
+            // Draw Background Image (canvas.png)
+            if (images.bg.complete) {
+                ctx.drawImage(images.bg, 0, 0, width, height);
+            }
+
+            // Draw History (Faded Layer)
             ctx.globalAlpha = 1.0;
             ctx.drawImage(historyCanvas, 0, 0);
 
-            // 3. Draw Current Trail
+            // Draw Current Trail
             ctx.beginPath();
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.lineWidth = 2.5;
             ctx.lineJoin = 'round';
             if (trail.length > 0) {
                 ctx.moveTo(trail[0].x, trail[0].y);
@@ -225,30 +222,27 @@
             }
             ctx.stroke();
 
-            // 4. Draw Dino
+            // Draw Dino
+            ctx.globalAlpha = 1.0;
             let img;
-            if (dino.state === 'end') {
-                img = images.end;
-            } else if (dino.state === 'jump') {
-                img = images.jump;
-            } else {
-                img = (Math.floor(dino.animFrame / 10) % 2 === 0) ? images.walk1 : images.walk2;
-            }
+            if (dino.state === 'end') img = images.end;
+            else if (dino.state === 'jump') img = images.jump;
+            else img = (Math.floor(dino.animFrame / 8) % 2 === 0) ? images.walk1 : images.walk2;
             
             ctx.drawImage(img, dino.x, dino.y, 44, 47);
         }
 
         function endGame() {
+            if (dino.state === 'end') return;
             dino.state = 'end';
             audio.drumroll.pause();
             audio.symbal.currentTime = 0;
             audio.symbal.play();
 
-            // Save current trail to history with 90% reduced brightness (alpha)
-            historyCtx.globalAlpha = 0.1; // Maintain 10% of original (90% faded)
+            historyCtx.globalAlpha = 0.15;
             historyCtx.beginPath();
             historyCtx.strokeStyle = 'black';
-            historyCtx.lineWidth = 2;
+            historyCtx.lineWidth = 2.5;
             if (trail.length > 0) {
                 historyCtx.moveTo(trail[0].x, trail[0].y);
                 for (let i = 1; i < trail.length; i++) {
@@ -259,62 +253,47 @@
             historyCtx.globalAlpha = 1.0;
         }
 
-        function showUI() {
-            ui.classList.add('visible');
-        }
-
-        // Input Handling
-        function startJump() {
+        function handleJumpStart() {
             if (dino.state === 'end' || dino.isJumping) return;
             jumpPressStartTime = performance.now();
             isPressing = true;
         }
 
-        function endJump() {
+        function handleJumpEnd() {
             if (!isPressing || dino.isJumping) return;
             isPressing = false;
             
             const pressDuration = performance.now() - jumpPressStartTime;
-            const maxDuration = 500; // 0.5s for max jump
-            const ratio = Math.min(pressDuration / maxDuration, 1);
+            // 0.1s ~ 0.4s 사이에서 선형적으로 힘 결정
+            const ratio = Math.min(Math.max((pressDuration - 100) / 300, 0), 1);
             
-            // Jump height targets: Short 40%, Long 80%
-            // V = sqrt(2 * g * h)
-            const minH = height * 0.4;
-            const maxH = height * 0.8;
+            const minH = height * 0.35;
+            const maxH = height * 0.85;
             const targetH = minH + (maxH - minH) * ratio;
             
             dino.vy = -Math.sqrt(2 * GRAVITY * targetH);
             dino.isJumping = true;
-            dino.hasJumped = true;
         }
 
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
+            if (e.code === 'Space' && !e.repeat) {
                 e.preventDefault();
-                startJump();
+                handleJumpStart();
             }
         });
         window.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                endJump();
-            }
+            if (e.code === 'Space') handleJumpEnd();
         });
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startJump();
-        });
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            endJump();
-        });
+        
+        canvas.addEventListener('mousedown', (e) => { e.preventDefault(); handleJumpStart(); });
+        window.addEventListener('mouseup', handleJumpEnd);
+        
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleJumpStart(); });
+        canvas.addEventListener('touchend', (e) => { e.preventDefault(); handleJumpEnd(); });
 
-        restartBtn.addEventListener('click', () => {
-            resetDino();
-            requestAnimationFrame(tick);
-        });
-
+        restartBtn.addEventListener('click', () => { resetDino(); requestAnimationFrame(tick); });
         clearBtn.addEventListener('click', () => {
+            historyCtx.clearRect(0, 0, width, height);
             historyCtx.fillStyle = 'white';
             historyCtx.fillRect(0, 0, width, height);
             resetDino();
