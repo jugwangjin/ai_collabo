@@ -108,7 +108,7 @@
         const GROUND_Y_OFFSET = 20;
         const GRAVITY = 0.6;
         const SPEED = 4.2;
-        const JITTER_AMOUNT = 0.8;
+        const JITTER_AMOUNT = 2.5; // 지터 강도 대폭 강화
 
         // Game State
         let width, height;
@@ -118,7 +118,8 @@
             vy: 0,
             isJumping: false,
             state: 'walk', // walk, jump, end
-            animFrame: 0
+            animFrame: 0,
+            currentLineWidth: 2.5
         };
         let jumpPressStartTime = 0;
         let isPressing = false;
@@ -137,8 +138,8 @@
                 historyCanvas.width = width;
                 historyCanvas.height = height;
                 historyCtx = historyCanvas.getContext('2d');
-                historyCtx.fillStyle = 'white';
-                historyCtx.fillRect(0, 0, width, height);
+                // 배경을 흰색이 아닌 투명하게 유지하여 이미지 배경이 보이게 함
+                historyCtx.clearRect(0, 0, width, height);
             }
 
             resetDino();
@@ -152,7 +153,8 @@
             dino.isJumping = false;
             dino.state = 'walk';
             dino.animFrame = 0;
-            trail = [{x: dino.x + 22, y: dino.y + 45}];
+            dino.currentLineWidth = 2.5;
+            trail = [{x: dino.x + 22, y: dino.y + 45, w: 2.5}];
             
             ui.classList.remove('visible');
             audio.drumroll.currentTime = 0;
@@ -174,10 +176,14 @@
 
             dino.x += SPEED;
             
+            // 선 굵기 지터 (Smooth)
+            dino.currentLineWidth += (Math.random() - 0.5) * 0.5;
+            dino.currentLineWidth = Math.max(1.5, Math.min(4, dino.currentLineWidth));
+
             if (dino.isJumping) {
                 dino.vy += GRAVITY;
-                // 점프 중에는 평소의 1.5배 지터 적용
-                dino.y += dino.vy + (Math.random() - 0.5) * JITTER_AMOUNT * 1.5;
+                // 점프 중 거친 지터 (1.5배)
+                dino.y += dino.vy + (Math.random() - 0.5) * JITTER_AMOUNT * 2.5;
                 dino.state = 'jump';
 
                 if (dino.y >= height - GROUND_Y_OFFSET - 47) {
@@ -185,6 +191,7 @@
                     endGame();
                 }
             } else {
+                // 평소 거친 지터
                 dino.y += (Math.random() - 0.5) * JITTER_AMOUNT;
                 dino.state = 'walk';
                 dino.animFrame++;
@@ -195,35 +202,35 @@
                 endGame();
             }
 
-            trail.push({x: dino.x + 22, y: dino.y + 45});
+            trail.push({x: dino.x + 22, y: dino.y + 45, w: dino.currentLineWidth});
         }
 
         function draw() {
             ctx.clearRect(0, 0, width, height);
 
-            // Draw Background Image (canvas.png)
+            // 1. Draw Background Image (Full Fill)
             if (images.bg.complete) {
                 ctx.drawImage(images.bg, 0, 0, width, height);
             }
 
-            // Draw History (Faded Layer)
+            // 2. Draw History
             ctx.globalAlpha = 1.0;
             ctx.drawImage(historyCanvas, 0, 0);
 
-            // Draw Current Trail
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-            ctx.lineWidth = 2.5;
-            ctx.lineJoin = 'round';
-            if (trail.length > 0) {
-                ctx.moveTo(trail[0].x, trail[0].y);
+            // 3. Draw Current Trail (Segmented for variable width)
+            if (trail.length > 1) {
                 for (let i = 1; i < trail.length; i++) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+                    ctx.lineWidth = trail[i].w;
+                    ctx.lineCap = 'round';
+                    ctx.moveTo(trail[i-1].x, trail[i-1].y);
                     ctx.lineTo(trail[i].x, trail[i].y);
+                    ctx.stroke();
                 }
             }
-            ctx.stroke();
 
-            // Draw Dino
+            // 4. Draw Dino
             ctx.globalAlpha = 1.0;
             let img;
             if (dino.state === 'end') img = images.end;
@@ -240,17 +247,19 @@
             audio.symbal.currentTime = 0;
             audio.symbal.play();
 
-            historyCtx.globalAlpha = 0.15;
-            historyCtx.beginPath();
-            historyCtx.strokeStyle = 'black';
-            historyCtx.lineWidth = 2.5;
-            if (trail.length > 0) {
-                historyCtx.moveTo(trail[0].x, trail[0].y);
+            // Save current trail to history with low alpha
+            historyCtx.globalAlpha = 0.12;
+            if (trail.length > 1) {
                 for (let i = 1; i < trail.length; i++) {
+                    historyCtx.beginPath();
+                    historyCtx.strokeStyle = 'black';
+                    historyCtx.lineWidth = trail[i].w;
+                    historyCtx.lineCap = 'round';
+                    historyCtx.moveTo(trail[i-1].x, trail[i-1].y);
                     historyCtx.lineTo(trail[i].x, trail[i].y);
+                    historyCtx.stroke();
                 }
             }
-            historyCtx.stroke();
             historyCtx.globalAlpha = 1.0;
         }
 
