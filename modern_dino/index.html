@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Dino: Performance Art</title>
+    <style>
+        :root {
+            --bg-color: #f7f7f7;
+            --accent-color: #333;
+        }
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--accent-color);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            background: white;
+            line-height: 0;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #ui.visible {
+            opacity: 1;
+        }
+        button {
+            padding: 10px 25px;
+            font-family: inherit;
+            background: white;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #eee;
+            border-color: #999;
+        }
+        .instructions {
+            position: absolute;
+            bottom: -40px;
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        <div class="instructions">SPACE TO JUMP (HOLD FOR HIGHER) | TOUCH SCREEN</div>
+    </div>
+
+    <div id="ui">
+        <button id="restartBtn">RESTART</button>
+        <button id="clearBtn">CLEAR CANVAS</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const restartBtn = document.getElementById('restartBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        // Assets
+        const imgPath = 'assets/';
+        const images = {
+            walk1: new Image(),
+            walk2: new Image(),
+            jump: new Image(),
+            end: new Image()
+        };
+        images.walk1.src = imgPath + 'walk_1.png';
+        images.walk2.src = imgPath + 'walk_2.png';
+        images.jump.src = imgPath + 'jump.png';
+        images.end.src = imgPath + 'end.png';
+
+        const audio = {
+            drumroll: new Audio(imgPath + 'drumroll.MP3'),
+            symbal: new Audio(imgPath + 'crashsymbal.MP3')
+        };
+        audio.drumroll.loop = true;
+
+        // Constants
+        const GROUND_Y_OFFSET = 20;
+        const GRAVITY = 0.5;
+        const SPEED = 3.5;
+        const JITTER_AMOUNT = 0.8;
+
+        // Game State
+        let width, height;
+        let dino = {
+            x: 0,
+            y: 0,
+            vy: 0,
+            isJumping: false,
+            hasJumped: false,
+            state: 'walk', // walk, jump, end
+            animFrame: 0
+        };
+        let jumpPressStartTime = 0;
+        let isPressing = false;
+        let trail = [];
+        let historyCanvas;
+        let historyCtx;
+
+        function init() {
+            width = window.innerWidth * 0.8;
+            height = 400;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Offscreen canvas for history (persisting trails)
+            if (!historyCanvas) {
+                historyCanvas = document.createElement('canvas');
+                historyCanvas.width = width;
+                historyCanvas.height = height;
+                historyCtx = historyCanvas.getContext('2d');
+                historyCtx.fillStyle = 'white';
+                historyCtx.fillRect(0, 0, width, height);
+            }
+
+            resetDino();
+            requestAnimationFrame(tick);
+        }
+
+        function resetDino() {
+            dino.x = 20;
+            dino.y = height - GROUND_Y_OFFSET - 40; // Approx dino height
+            dino.vy = 0;
+            dino.isJumping = false;
+            dino.hasJumped = false;
+            dino.state = 'walk';
+            dino.animFrame = 0;
+            trail = [{x: dino.x + 20, y: dino.y + 40}];
+            
+            ui.classList.remove('visible');
+            audio.drumroll.currentTime = 0;
+            audio.drumroll.play();
+        }
+
+        function tick(timestamp) {
+            update();
+            draw();
+            if (dino.state !== 'end') {
+                requestAnimationFrame(tick);
+            } else {
+                showUI();
+            }
+        }
+
+        function update() {
+            if (dino.state === 'end') return;
+
+            // Horizontal Movement
+            dino.x += SPEED;
+            
+            // Vertical Jitter
+            let jitter = (Math.random() - 0.5) * JITTER_AMOUNT;
+            
+            // Physics
+            if (dino.isJumping) {
+                dino.vy += GRAVITY;
+                dino.y += dino.vy;
+                dino.state = 'jump';
+
+                // Hit ground
+                if (dino.y >= height - GROUND_Y_OFFSET - 40) {
+                    dino.y = height - GROUND_Y_OFFSET - 40;
+                    endGame();
+                }
+            } else {
+                dino.y += jitter;
+                dino.state = 'walk';
+                dino.animFrame++;
+            }
+
+            // Hit wall
+            if (dino.x > width - 40) {
+                dino.x = width - 40;
+                endGame();
+            }
+
+            // Record Trail (relative to dino's bottom center)
+            trail.push({x: dino.x + 20, y: dino.y + 38});
+        }
+
+        function draw() {
+            // 1. Clear Main Canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // 2. Draw History (Faded)
+            ctx.globalAlpha = 1.0;
+            ctx.drawImage(historyCanvas, 0, 0);
+
+            // 3. Draw Current Trail
+            ctx.beginPath();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            if (trail.length > 0) {
+                ctx.moveTo(trail[0].x, trail[0].y);
+                for (let i = 1; i < trail.length; i++) {
+                    ctx.lineTo(trail[i].x, trail[i].y);
+                }
+            }
+            ctx.stroke();
+
+            // 4. Draw Dino
+            let img;
+            if (dino.state === 'end') {
+                img = images.end;
+            } else if (dino.state === 'jump') {
+                img = images.jump;
+            } else {
+                img = (Math.floor(dino.animFrame / 10) % 2 === 0) ? images.walk1 : images.walk2;
+            }
+            
+            ctx.drawImage(img, dino.x, dino.y, 44, 47);
+        }
+
+        function endGame() {
+            dino.state = 'end';
+            audio.drumroll.pause();
+            audio.symbal.currentTime = 0;
+            audio.symbal.play();
+
+            // Save current trail to history with 90% reduced brightness (alpha)
+            historyCtx.globalAlpha = 0.1; // Maintain 10% of original (90% faded)
+            historyCtx.beginPath();
+            historyCtx.strokeStyle = 'black';
+            historyCtx.lineWidth = 2;
+            if (trail.length > 0) {
+                historyCtx.moveTo(trail[0].x, trail[0].y);
+                for (let i = 1; i < trail.length; i++) {
+                    historyCtx.lineTo(trail[i].x, trail[i].y);
+                }
+            }
+            historyCtx.stroke();
+            historyCtx.globalAlpha = 1.0;
+        }
+
+        function showUI() {
+            ui.classList.add('visible');
+        }
+
+        // Input Handling
+        function startJump() {
+            if (dino.state === 'end' || dino.isJumping) return;
+            jumpPressStartTime = performance.now();
+            isPressing = true;
+        }
+
+        function endJump() {
+            if (!isPressing || dino.isJumping) return;
+            isPressing = false;
+            
+            const pressDuration = performance.now() - jumpPressStartTime;
+            const maxDuration = 500; // 0.5s for max jump
+            const ratio = Math.min(pressDuration / maxDuration, 1);
+            
+            // Jump height targets: Short 40%, Long 80%
+            // V = sqrt(2 * g * h)
+            const minH = height * 0.4;
+            const maxH = height * 0.8;
+            const targetH = minH + (maxH - minH) * ratio;
+            
+            dino.vy = -Math.sqrt(2 * GRAVITY * targetH);
+            dino.isJumping = true;
+            dino.hasJumped = true;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                startJump();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                endJump();
+            }
+        });
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startJump();
+        });
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            endJump();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            resetDino();
+            requestAnimationFrame(tick);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            historyCtx.fillStyle = 'white';
+            historyCtx.fillRect(0, 0, width, height);
+            resetDino();
+            requestAnimationFrame(tick);
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>
