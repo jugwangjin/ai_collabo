@@ -176,7 +176,8 @@
             
             if (dino.isJumping) {
                 dino.vy += GRAVITY;
-                dino.y += dino.vy;
+                // 점프 중에는 평소의 1.5배 지터 적용
+                dino.y += dino.vy + (Math.random() - 0.5) * JITTER_AMOUNT * 1.5;
                 dino.state = 'jump';
 
                 if (dino.y >= height - GROUND_Y_OFFSET - 47) {
