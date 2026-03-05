@@ -137,43 +137,48 @@
         let historyCtx;
 
         function init() {
-            // UI 영역(약 150px)과 여백을 고려하여 캔버스 높이 결정
-            const uiEstimatedHeight = 180;
-            width = Math.min(window.innerWidth * 0.95, 1000);
+            // UI 영역과 여백을 고려하여 캔버스 높이 결정
+            const uiEstimatedHeight = window.innerWidth > window.innerHeight ? 120 : 180;
+            const newWidth = Math.min(window.innerWidth * 0.95, 1000);
             
-            // 가로 모드일 경우 높이를 더 작게, 세로 모드일 경우 충분히 확보
             let calculatedHeight = window.innerHeight - uiEstimatedHeight;
-            height = Math.max(250, Math.min(500, calculatedHeight));
+            const newHeight = Math.max(200, Math.min(500, calculatedHeight));
             
+            // 기존 캔버스 내용 보존을 위한 임시 저장
+            let tempCanvas = null;
+            if (historyCanvas) {
+                tempCanvas = document.createElement('canvas');
+                tempCanvas.width = historyCanvas.width;
+                tempCanvas.height = historyCanvas.height;
+                tempCanvas.getContext('2d').drawImage(historyCanvas, 0, 0);
+            }
+
+            width = newWidth;
+            height = newHeight;
             canvas.width = width;
             canvas.height = height;
 
-            if (!historyCanvas) {
-                historyCanvas = document.createElement('canvas');
-                historyCanvas.width = width;
-                historyCanvas.height = height;
-                historyCtx = historyCanvas.getContext('2d');
-                historyCtx.clearRect(0, 0, width, height);
+            // 히스토리 캔버스 재생성 및 내용 복사
+            historyCanvas = document.createElement('canvas');
+            historyCanvas.width = width;
+            historyCanvas.height = height;
+            historyCtx = historyCanvas.getContext('2d');
+            historyCtx.clearRect(0, 0, width, height);
+            
+            if (tempCanvas) {
+                // 비율에 맞춰 이전 내용 복사 (좌하단 기준)
+                historyCtx.drawImage(tempCanvas, 0, tempCanvas.height - height, width, height, 0, 0, width, height);
             }
 
             resetDino();
-            requestAnimationFrame(tick);
+            if (dino.state === 'end') draw();
         }
 
-        function resetDino() {
-            dino.x = 20;
-            dino.y = height - GROUND_Y_OFFSET - 47;
-            dino.vy = 0;
-            dino.isJumping = false;
-            dino.state = 'walk';
-            dino.animFrame = 0;
-            dino.currentLineWidth = 2.5;
-            dino.currentSpeed = WALK_SPEED;
-            trail = [{x: dino.x + 22, y: dino.y + 45, w: 2.5}];
-            
-            ui.classList.remove('visible');
-            audio.drumroll.currentTime = 0;
-            audio.drumroll.play();
+        let isRunning = false;
+        function startLoop() {
+            if (isRunning) return;
+            isRunning = true;
+            requestAnimationFrame(tick);
         }
 
         function tick() {
@@ -182,6 +187,7 @@
             if (dino.state !== 'end') {
                 requestAnimationFrame(tick);
             } else {
+                isRunning = false;
                 ui.classList.add('visible');
             }
         }
@@ -318,14 +324,41 @@
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleJumpStart(); });
         canvas.addEventListener('touchend', (e) => { e.preventDefault(); handleJumpEnd(); });
 
-        restartBtn.addEventListener('click', () => { resetDino(); requestAnimationFrame(tick); });
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                init();
+                if (dino.state !== 'end') startLoop();
+            }, 200);
+        });
+
+        function resetDino() {
+            dino.x = 20;
+            dino.y = height - GROUND_Y_OFFSET - 47;
+            dino.vy = 0;
+            dino.isJumping = false;
+            dino.state = 'walk';
+            dino.animFrame = 0;
+            dino.currentLineWidth = 2.5;
+            dino.currentSpeed = WALK_SPEED;
+            trail = [{x: dino.x + 22, y: dino.y + 45, w: 2.5}];
+            
+            ui.classList.remove('visible');
+            audio.drumroll.currentTime = 0;
+            audio.drumroll.play();
+        }
+
+        restartBtn.addEventListener('click', () => { resetDino(); startLoop(); });
         clearBtn.addEventListener('click', () => {
             historyCtx.clearRect(0, 0, width, height);
             resetDino();
-            requestAnimationFrame(tick);
+            startLoop();
         });
 
-        window.onload = init;
+        window.onload = () => {
+            init();
+            startLoop();
+        };
     </script>
 </body>
 </html>
