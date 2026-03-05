@@ -17,48 +17,55 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-sizing: border-box;
         }
         #canvas-container {
             position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             background: white;
             line-height: 0;
+            max-width: 95vw;
         }
         canvas {
             display: block;
+            max-width: 100%;
         }
         #ui {
             margin-top: 20px;
             display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 15px;
             opacity: 0;
             transition: opacity 0.5s;
+            width: 100%;
         }
         #ui.visible {
             opacity: 1;
         }
         button {
-            padding: 10px 25px;
+            padding: 12px 30px;
             font-family: inherit;
             background: white;
             border: 1px solid #ccc;
             cursor: pointer;
             transition: all 0.2s;
+            font-size: 14px;
         }
         button:hover {
             background: #eee;
             border-color: #999;
         }
         .instructions {
-            position: absolute;
-            bottom: -40px;
-            width: 100%;
             text-align: center;
             font-size: 12px;
             color: #999;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -130,8 +137,14 @@
         let historyCtx;
 
         function init() {
-            width = Math.min(window.innerWidth * 0.9, 1000);
-            height = 500;
+            // UI 영역(약 150px)과 여백을 고려하여 캔버스 높이 결정
+            const uiEstimatedHeight = 180;
+            width = Math.min(window.innerWidth * 0.95, 1000);
+            
+            // 가로 모드일 경우 높이를 더 작게, 세로 모드일 경우 충분히 확보
+            let calculatedHeight = window.innerHeight - uiEstimatedHeight;
+            height = Math.max(250, Math.min(500, calculatedHeight));
+            
             canvas.width = width;
             canvas.height = height;
 
@@ -140,7 +153,6 @@
                 historyCanvas.width = width;
                 historyCanvas.height = height;
                 historyCtx = historyCanvas.getContext('2d');
-                // 배경을 흰색이 아닌 투명하게 유지하여 이미지 배경이 보이게 함
                 historyCtx.clearRect(0, 0, width, height);
             }
 
