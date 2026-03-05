@@ -309,8 +309,6 @@
         restartBtn.addEventListener('click', () => { resetDino(); requestAnimationFrame(tick); });
         clearBtn.addEventListener('click', () => {
             historyCtx.clearRect(0, 0, width, height);
-            historyCtx.fillStyle = 'white';
-            historyCtx.fillRect(0, 0, width, height);
             resetDino();
             requestAnimationFrame(tick);
         });
