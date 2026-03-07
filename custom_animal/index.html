@@ -68,10 +68,12 @@
         button.active { background: var(--accent); color: #000; }
         
         .bone-list { margin-top: 20px; flex: 1; overflow-y: auto; font-size: 10px; opacity: 0.7; }
-        .bone-item { padding: 5px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
+        .bone-item { padding: 5px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .bone-item.selected { background: rgba(0, 255, 204, 0.2); border-left: 2px solid var(--accent); }
         
         canvas { display: block; width: 100%; height: 100%; }
         
+        .editor-help { font-size: 9px; color: #888; margin-top: 10px; line-height: 1.4; }
         .instructions {
             position: absolute; bottom: 30px; right: 30px; font-size: 11px; opacity: 0.3; text-align: right; pointer-events: none;
         }
@@ -89,12 +91,19 @@
 
         <div class="controls">
             <button id="apply-btn">월드에 적용하기</button>
+            
+            <div class="editor-help">
+                • 관절(점) 클릭: 연결할 부모 선택<br>
+                • 빈 공간 클릭: 선택된 곳에 새 뼈대 추가
+            </div>
+
             <div class="control-group">
-                <span class="label">부위 추가 (머리부터 시작하세요)</span>
+                <span class="label">부위 설정</span>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                     <button id="add-move-btn" class="active">관절 부위</button>
                     <button id="add-garment-btn">장식 부위</button>
                 </div>
+                <button id="delete-btn" style="margin-top: 5px; width: 100%; border-color: #555;">마지막 부위 삭제</button>
             </div>
             
             <div class="control-group">
@@ -133,23 +142,21 @@
         const speedSlider = document.getElementById('speed-slider');
         const speedValEl = document.getElementById('speed-val');
         const applyBtn = document.getElementById('apply-btn');
+        const deleteBtn = document.getElementById('delete-btn');
         
         let width, height;
         let mouseX = 0, mouseY = 0;
         let isRightClick = false;
         let isMouseDown = false;
-        let rippleTimer = 0; // 파문 생성 타이머 추가
-        
-        // Audio Assets
-        const soundLeft = new Audio('left.mp3');
-        const soundRight = new Audio('right.mp3');
+        let rippleTimer = 0;
         
         // Editor State
-        let selectedType = 'moving'; // moving, garment
+        let selectedType = 'moving';
         let symmetryEnabled = false;
         let speedMultiplier = 1.0;
+        let selectedBoneId = 0; // 현재 선택된 부모 ID
         let blueprintBones = [
-            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0 }
+            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, computedX: 140, computedY: 100 }
         ];
         
         // Speed Slider Event
@@ -174,8 +181,9 @@
         function initAnimal() {
             animal.pos = { x: (window.innerWidth - 320) / 2 + 320, y: window.innerHeight / 2 };
             blueprintBones = [
-                { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0 }
+                { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, computedX: 140, computedY: 100 }
             ];
+            selectedBoneId = 0;
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
             updateBoneList();
             
@@ -235,6 +243,17 @@
             setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000);
         };
 
+        deleteBtn.onclick = () => {
+            if (blueprintBones.length > 1) {
+                const last = blueprintBones.pop();
+                if (last.id % 2 !== 0 && blueprintBones[blueprintBones.length-1].id === last.id - 1) {
+                    blueprintBones.pop();
+                }
+                selectedBoneId = blueprintBones[blueprintBones.length-1].id;
+                updateBoneList();
+            }
+        };
+
         // Editor Logic
         document.getElementById('add-move-btn').onclick = () => {
             selectedType = 'moving';
@@ -253,31 +272,64 @@
         };
         document.getElementById('reset-btn').onclick = () => initAnimal();
 
-        editorCanvas.onclick = () => addBone();
+        editorCanvas.onclick = (e) => {
+            const rect = editorCanvas.getBoundingClientRect();
+            const ex = e.clientX - rect.left;
+            const ey = e.clientY - rect.top;
 
-        function addBone() {
-            const parentIdx = blueprintBones.length - 1;
-            const id = Date.now();
-            const angle = (Math.random() - 0.5) * Math.PI;
+            const clickedBone = blueprintBones.find(b => {
+                return Math.hypot(ex - b.computedX, ey - b.computedY) < 15;
+            });
+
+            if (clickedBone) {
+                selectedBoneId = clickedBone.id;
+                updateBoneList();
+                return;
+            }
+
+            addBoneAt(ex, ey);
+        };
+
+        function addBoneAt(targetX, targetY) {
+            const parent = blueprintBones.find(b => b.id === selectedBoneId);
+            if (!parent) return;
+
+            const dx = targetX - parent.computedX;
+            const dy = targetY - parent.computedY;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 10) return;
+
+            let parentWorldAngle = 0;
+            if (parent.parentId !== null) {
+                const grandParent = blueprintBones.find(b => b.id === parent.parentId);
+                parentWorldAngle = Math.atan2(parent.computedY - grandParent.computedY, parent.computedX - grandParent.computedX);
+            } else {
+                parentWorldAngle = -Math.PI / 2;
+            }
+
+            const clickAngle = Math.atan2(dy, dx);
+            let relativeAngle = clickAngle - parentWorldAngle;
             
+            const id = Date.now();
             const newBone = {
                 id: id,
-                parentId: blueprintBones[parentIdx].id,
-                length: 25 + Math.random() * 30,
-                angle: angle,
-                currentAngle: angle,
+                parentId: parent.id,
+                length: dist,
+                angle: relativeAngle,
+                currentAngle: relativeAngle,
                 type: selectedType,
                 phase: Math.random() * Math.PI * 2
             };
             
             blueprintBones.push(newBone);
-            
+            selectedBoneId = newBone.id;
+
             if (symmetryEnabled) {
                 blueprintBones.push({
                     ...newBone,
                     id: id + 1,
-                    angle: -angle,
-                    currentAngle: -angle,
+                    angle: -relativeAngle,
+                    currentAngle: -relativeAngle,
                     phase: newBone.phase + Math.PI
                 });
             }
@@ -288,9 +340,10 @@
             boneListEl.innerHTML = '<div class="label">골격 데이터:</div>';
             blueprintBones.forEach((b, i) => {
                 const div = document.createElement('div');
-                div.className = 'bone-item';
+                div.className = `bone-item ${b.id === selectedBoneId ? 'selected' : ''}`;
                 const typeMap = { 'head': '머리', 'moving': '관절', 'garment': '장식' };
                 div.innerHTML = `<span>[${i}] ${typeMap[b.type]}</span> <span>길이: ${Math.round(b.length)}</span>`;
+                div.onclick = (e) => { e.stopPropagation(); selectedBoneId = b.id; updateBoneList(); };
                 boneListEl.appendChild(div);
             });
         }
@@ -353,16 +406,19 @@
             });
         }
 
-        function drawSkeleton(targetCtx, bones, x, y, baseAngle, timeScale = 0) {
+        function drawSkeleton(targetCtx, bones, startX, startY, baseAngle, timeScale = 0, isEditor = false) {
             const bonePositions = new Map();
             const time = performance.now() * 0.005 * timeScale;
 
             bones.forEach(bone => {
                 if (bone.type === 'head') {
-                    bonePositions.set(bone.id, { x: x, y: y, angle: baseAngle });
-                    targetCtx.fillStyle = '#00ffcc';
+                    bone.computedX = startX;
+                    bone.computedY = startY;
+                    bonePositions.set(bone.id, { x: startX, y: startY, angle: baseAngle });
+                    
+                    targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : '#00ffcc';
                     targetCtx.beginPath();
-                    targetCtx.arc(x, y, 5, 0, Math.PI * 2);
+                    targetCtx.arc(startX, startY, 5, 0, Math.PI * 2);
                     targetCtx.fill();
                     return;
                 }
@@ -379,7 +435,12 @@
                 const ex = parent.x + Math.cos(worldAngle) * bone.length;
                 const ey = parent.y + Math.sin(worldAngle) * bone.length;
 
+                bone.computedX = ex;
+                bone.computedY = ey;
+
                 targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+                if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
+                
                 targetCtx.lineWidth = bone.type === 'moving' ? 2 : 1;
                 targetCtx.beginPath();
                 targetCtx.moveTo(parent.x, parent.y);
@@ -387,6 +448,8 @@
                 targetCtx.stroke();
 
                 targetCtx.fillStyle = bone.type === 'moving' ? '#00ffcc' : '#555';
+                if (bone.id === selectedBoneId && isEditor) targetCtx.fillStyle = '#ffcc00';
+                
                 targetCtx.beginPath();
                 targetCtx.arc(ex, ey, 2.5, 0, Math.PI * 2);
                 targetCtx.fill();
@@ -421,12 +484,22 @@
             });
 
             // Draw World Animal
-            drawSkeleton(ctx, animal.bones, animal.pos.x, animal.pos.y, animal.angle, speedMultiplier);
+            drawSkeleton(ctx, animal.bones, animal.pos.x, animal.pos.y, animal.angle, speedMultiplier, false);
 
             // Draw Editor Blueprint
             editorCtx.fillStyle = '#000';
             editorCtx.fillRect(0, 0, 280, 200);
-            drawSkeleton(editorCtx, blueprintBones, 140, 100, -Math.PI / 2, 0); 
+            
+            // Center indicator
+            editorCtx.strokeStyle = '#222';
+            editorCtx.setLineDash([5, 5]);
+            editorCtx.beginPath();
+            editorCtx.moveTo(140, 0); editorCtx.lineTo(140, 200);
+            editorCtx.moveTo(0, 100); editorCtx.lineTo(280, 100);
+            editorCtx.stroke();
+            editorCtx.setLineDash([]);
+
+            drawSkeleton(editorCtx, blueprintBones, 140, 100, -Math.PI / 2, 0, true); 
         }
 
         function loop() {
