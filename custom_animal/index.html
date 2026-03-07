@@ -397,8 +397,30 @@
 
             // BG Particle Update
             animal.bgParticles.forEach(p => {
+                if (isMouseDown) {
+                    const dx = p.x - mouseX;
+                    const dy = p.y - mouseY;
+                    const dist = Math.hypot(dx, dy);
+                    const forceRadius = isRightClick ? 300 : 200;
+                    
+                    if (dist < forceRadius) {
+                        const force = (1 - dist / forceRadius) * (isRightClick ? 1.5 : 0.4);
+                        p.vx += (dx / dist) * force;
+                        p.vy += (dy / dist) * force;
+                    }
+                }
+
                 p.x += p.vx;
                 p.y += p.vy;
+                
+                // 서서히 원래 속도로 감쇄 (마찰력)
+                p.vx *= 0.97;
+                p.vy *= 0.97;
+
+                // 최소한의 유영 속도 유지
+                p.vx += (Math.random() - 0.5) * 0.02;
+                p.vy += (Math.random() - 0.5) * 0.02;
+
                 if (p.x < 0) p.x = width;
                 if (p.x > width) p.x = 0;
                 if (p.y < 0) p.y = height;
