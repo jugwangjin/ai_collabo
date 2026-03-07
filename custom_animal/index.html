@@ -81,46 +81,46 @@
 <body>
 
     <div id="editor-panel">
-        <h1>CUSTOM ANIMAL<br>GENETIC LAB</h1>
+        <h1>커스텀 애니멀<br>유전학 실험실</h1>
         
         <div id="editor-canvas-container">
             <canvas id="editor-canvas"></canvas>
         </div>
 
         <div class="controls">
-            <button id="apply-btn">APPLY TO WORLD</button>
+            <button id="apply-btn">월드에 적용하기</button>
             <div class="control-group">
-                <span class="label">ADD PART (CLICK HEAD TO START)</span>
+                <span class="label">부위 추가 (머리부터 시작하세요)</span>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                    <button id="add-move-btn" class="active">MOVING PART</button>
-                    <button id="add-garment-btn">GARMENT</button>
+                    <button id="add-move-btn" class="active">관절 부위</button>
+                    <button id="add-garment-btn">장식 부위</button>
                 </div>
             </div>
             
             <div class="control-group">
-                <span class="label">OPTIONS</span>
-                <button id="symmetry-btn">SYMMETRY MODE: OFF</button>
+                <span class="label">옵션</span>
+                <button id="symmetry-btn">대칭 모드: 끔</button>
                 <div style="margin-top: 15px;">
-                    <span class="label">SPEED MULTIPLIER: <span id="speed-val">1.0</span>x</span>
+                    <span class="label">이동 속도 배율: <span id="speed-val">1.0</span>x</span>
                     <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1" style="width: 100%; accent-color: var(--accent);">
                 </div>
-                <button id="reset-btn" style="margin-top: 15px; width: 100%; color: #ff5555;">RESET ALL</button>
+                <button id="reset-btn" style="margin-top: 15px; width: 100%; color: #ff5555;">모두 초기화</button>
             </div>
         </div>
 
         <div class="bone-list" id="bone-list">
-            <div class="label">SKELETON DATA:</div>
+            <div class="label">골격 데이터:</div>
             <!-- Bones will be listed here -->
         </div>
     </div>
 
     <div id="world">
-        <a href="../index.html" class="back-btn">← EXIT</a>
+        <a href="../index.html" class="back-btn">← 나가기</a>
         <canvas id="canvas"></canvas>
         <div class="instructions">
-            LEFT CLICK: GENTLE WALK (PULL)<br>
-            RIGHT CLICK: FAST RUN (PULL)<br>
-            CLICK HEAD IN EDITOR AREA TO DEFINE SHAPE
+            왼쪽 클릭: 잔잔한 걸음 (유도)<br>
+            오른쪽 클릭: 빠른 질주 (유도)<br>
+            에디터 캔버스를 클릭하여 뼈대를 설계하세요.
         </div>
     </div>
 
@@ -230,8 +230,8 @@
 
         applyBtn.onclick = () => {
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
-            applyBtn.innerText = 'APPLIED!';
-            setTimeout(() => applyBtn.innerText = 'APPLY TO WORLD', 1000);
+            applyBtn.innerText = '적용 완료!';
+            setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000);
         };
 
         // Editor Logic
@@ -247,7 +247,7 @@
         };
         document.getElementById('symmetry-btn').onclick = () => {
             symmetryEnabled = !symmetryEnabled;
-            document.getElementById('symmetry-btn').innerText = `SYMMETRY MODE: ${symmetryEnabled ? 'ON' : 'OFF'}`;
+            document.getElementById('symmetry-btn').innerText = `대칭 모드: ${symmetryEnabled ? '켬' : '끔'}`;
             document.getElementById('symmetry-btn').style.color = symmetryEnabled ? '#00ffcc' : '#fff';
         };
         document.getElementById('reset-btn').onclick = () => initAnimal();
@@ -284,11 +284,12 @@
         }
 
         function updateBoneList() {
-            boneListEl.innerHTML = '<div class="label">SKELETON DATA:</div>';
+            boneListEl.innerHTML = '<div class="label">골격 데이터:</div>';
             blueprintBones.forEach((b, i) => {
                 const div = document.createElement('div');
                 div.className = 'bone-item';
-                div.innerHTML = `<span>[${i}] ${b.type.toUpperCase()}</span> <span>LEN: ${Math.round(b.length)}</span>`;
+                const typeMap = { 'head': '머리', 'moving': '관절', 'garment': '장식' };
+                div.innerHTML = `<span>[${i}] ${typeMap[b.type]}</span> <span>길이: ${Math.round(b.length)}</span>`;
                 boneListEl.appendChild(div);
             });
         }
