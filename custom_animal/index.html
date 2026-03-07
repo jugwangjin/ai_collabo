@@ -50,13 +50,27 @@
         .control-group { background: #222; padding: 15px; border-radius: 10px; font-size: 11px; }
         #editor-canvas-container {
             width: 100%;
-            height: 200px;
+            height: 300px; /* 초기 높이 상향 */
+            min-height: 150px;
+            max-height: 80vh;
             background: #000;
             border: 1px dashed #444;
-            margin-bottom: 15px;
+            margin-bottom: 0;
             position: relative;
-            border-radius: 10px;
+            border-radius: 10px 10px 0 0;
             overflow: hidden;
+        }
+        #editor-v-resizer {
+            width: 100%;
+            height: 8px;
+            background: #222;
+            cursor: row-resize;
+            margin-bottom: 15px;
+            border-radius: 0 0 10px 10px;
+            transition: background 0.2s;
+        }
+        #editor-v-resizer:hover, #editor-v-resizer.dragging {
+            background: var(--accent);
         }
         #apply-btn {
             width: 100%;
@@ -101,6 +115,7 @@
         <div id="editor-canvas-container">
             <canvas id="editor-canvas"></canvas>
         </div>
+        <div id="editor-v-resizer"></div>
 
         <div class="controls">
             <button id="apply-btn">월드에 적용하기</button>
@@ -159,43 +174,64 @@
         const applyBtn = document.getElementById('apply-btn');
         const deleteBtn = document.getElementById('delete-btn');
         const resizer = document.getElementById('resizer');
+        const editorVResizer = document.getElementById('editor-v-resizer');
         const editorPanel = document.getElementById('editor-panel');
+        const editorCanvasContainer = document.getElementById('editor-canvas-container');
         
         let width, height;
         let mouseX = 0, mouseY = 0;
         let isRightClick = false;
         let isMouseDown = false;
         let rippleTimer = 0;
-        let isResizing = false;
+        let isResizingH = false;
+        let isResizingV = false;
 
-        // Resizer Logic
+        // Resizer Logic (Horizontal)
         resizer.onmousedown = (e) => {
-            isResizing = true;
+            isResizingH = true;
             resizer.classList.add('dragging');
             document.body.style.cursor = 'col-resize';
             e.preventDefault();
         };
 
+        // Editor Vertical Resizer Logic
+        editorVResizer.onmousedown = (e) => {
+            isResizingV = true;
+            editorVResizer.classList.add('dragging');
+            document.body.style.cursor = 'row-resize';
+            e.preventDefault();
+        };
+
         window.addEventListener('mousemove', (e) => {
-            if (!isResizing) {
+            if (isResizingH) {
+                let newWidth = e.clientX;
+                if (newWidth >= 250 && newWidth <= 600) {
+                    editorPanel.style.width = newWidth + 'px';
+                    resize();
+                }
+            } else if (isResizingV) {
+                const rect = editorCanvasContainer.getBoundingClientRect();
+                let newHeight = e.clientY - rect.top;
+                if (newHeight >= 150 && newHeight <= window.innerHeight * 0.8) {
+                    editorCanvasContainer.style.height = newHeight + 'px';
+                    resize();
+                }
+            } else {
                 mouseX = e.clientX;
                 mouseY = e.clientY;
-                return;
-            }
-            
-            let newWidth = e.clientX;
-            if (newWidth >= 250 && newWidth <= 600) {
-                editorPanel.style.width = newWidth + 'px';
-                resize(); // 캔버스 크기 즉시 업데이트
             }
         });
 
         window.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
+            if (isResizingH) {
+                isResizingH = false;
                 resizer.classList.remove('dragging');
-                document.body.style.cursor = 'default';
             }
+            if (isResizingV) {
+                isResizingV = false;
+                editorVResizer.classList.remove('dragging');
+            }
+            document.body.style.cursor = 'default';
             isMouseDown = false;
         });
 
@@ -346,45 +382,53 @@
             const parent = blueprintBones.find(b => b.id === selectedBoneId);
             if (!parent) return;
 
-            const dx = targetX - parent.computedX;
-            const dy = targetY - parent.computedY;
+            const centerX = editorCanvas.width / 2;
+            const px = parent.computedX;
+            const py = parent.computedY;
+            
+            const dx = targetX - px;
+            const dy = targetY - py;
             const dist = Math.hypot(dx, dy);
             if (dist < 10) return;
 
-            let parentWorldAngle = 0;
-            if (parent.parentId !== null) {
-                const grandParent = blueprintBones.find(b => b.id === parent.parentId);
-                parentWorldAngle = Math.atan2(parent.computedY - grandParent.computedY, parent.computedX - grandParent.computedX);
-            } else {
-                parentWorldAngle = -Math.PI / 2;
-            }
-
-            const clickAngle = Math.atan2(dy, dx);
-            let relativeAngle = clickAngle - parentWorldAngle;
-            
+            // 로컬 좌표계로 변환 (부모 기준)
             const id = Date.now();
-            const newBone = {
-                id: id,
-                parentId: parent.id,
-                length: dist,
-                angle: relativeAngle,
-                currentAngle: relativeAngle,
-                type: selectedType,
-                phase: Math.random() * Math.PI * 2
-            };
             
+            // 뼈대 생성 함수
+            const createNewBone = (pId, x, y, isMirror = false) => {
+                const p = blueprintBones.find(b => b.id === pId);
+                const relDx = x - p.computedX;
+                const relDy = y - p.computedY;
+                const relAngle = Math.atan2(relDy, relDx);
+
+                return {
+                    id: isMirror ? id + 1 : id,
+                    parentId: pId,
+                    length: Math.hypot(relDx, relDy),
+                    angle: relAngle, // 에디터에서는 절대각, 월드에서는 상대각으로 해석됨
+                    type: selectedType,
+                    phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0),
+                    isMirror: isMirror
+                };
+            };
+
+            const newBone = createNewBone(parent.id, targetX, targetY);
             blueprintBones.push(newBone);
-            selectedBoneId = newBone.id;
 
             if (symmetryEnabled) {
-                blueprintBones.push({
-                    ...newBone,
-                    id: id + 1,
-                    angle: -relativeAngle,
-                    currentAngle: -relativeAngle,
-                    phase: newBone.phase + Math.PI
-                });
+                let mirrorParentId = parent.id;
+                // 부모가 mirror 상태라면 짝을 찾아 연결
+                if (parent.parentId !== null) {
+                    const mirrorParent = blueprintBones.find(b => b.parentId === parent.parentId && b.id !== parent.id && b.isMirror !== parent.isMirror);
+                    if (mirrorParent) mirrorParentId = mirrorParent.id;
+                }
+
+                const mirrorX = centerX - (targetX - centerX);
+                const mirrorBone = createNewBone(mirrorParentId, mirrorX, targetY, true);
+                blueprintBones.push(mirrorBone);
             }
+
+            selectedBoneId = newBone.id;
             updateBoneList();
         }
 
@@ -483,16 +527,17 @@
         function drawSkeleton(targetCtx, bones, startX, startY, baseAngle, timeScale = 0, isEditor = false) {
             const bonePositions = new Map();
             const time = performance.now() * 0.005 * timeScale;
+            const centerX = isEditor ? editorCanvas.width / 2 : 0;
 
             bones.forEach(bone => {
                 if (bone.type === 'head') {
-                    bone.computedX = startX;
-                    bone.computedY = startY;
-                    bonePositions.set(bone.id, { x: startX, y: startY, angle: baseAngle });
+                    bone.computedX = isEditor ? centerX : startX;
+                    bone.computedY = isEditor ? 100 : startY;
+                    bonePositions.set(bone.id, { x: bone.computedX, y: bone.computedY, angle: isEditor ? -Math.PI/2 : baseAngle });
                     
                     targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : '#00ffcc';
                     targetCtx.beginPath();
-                    targetCtx.arc(startX, startY, 5, 0, Math.PI * 2);
+                    targetCtx.arc(bone.computedX, bone.computedY, 5, 0, Math.PI * 2);
                     targetCtx.fill();
                     return;
                 }
@@ -500,12 +545,20 @@
                 const parent = bonePositions.get(bone.parentId);
                 if (!parent) return;
 
-                let animationOffset = 0;
-                if (bone.type === 'moving' && timeScale > 0) {
-                    animationOffset = Math.sin(time * (1 + animal.speed * 0.5) + bone.phase) * (0.2 + animal.speed * 0.1);
+                let worldAngle;
+                if (isEditor) {
+                    // 에디터에서는 저장된 절대각 유지
+                    worldAngle = bone.angle;
+                } else {
+                    // 월드에서는 부모 각도 + (저장된 각 - 초기 상태 각) + 애니메이션
+                    let animationOffset = 0;
+                    if (bone.type === 'moving' && timeScale > 0) {
+                        animationOffset = Math.sin(time * (1 + animal.speed * 0.5) + bone.phase) * (0.2 + animal.speed * 0.1);
+                    }
+                    // bone.angle - (-Math.PI/2) : 에디터의 기본 정렬(위쪽) 대비 상대각 계산
+                    worldAngle = parent.angle + (bone.angle - (-Math.PI / 2)) + animationOffset;
                 }
 
-                const worldAngle = parent.angle + bone.angle + animationOffset;
                 const ex = parent.x + Math.cos(worldAngle) * bone.length;
                 const ey = parent.y + Math.sin(worldAngle) * bone.length;
 
@@ -562,18 +615,18 @@
 
             // Draw Editor Blueprint
             editorCtx.fillStyle = '#000';
-            editorCtx.fillRect(0, 0, 280, 200);
+            editorCtx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
             
-            // Center indicator
-            editorCtx.strokeStyle = '#222';
+            // Center axis indicator (Symmetry line)
+            const centerX = editorCanvas.width / 2;
+            editorCtx.strokeStyle = symmetryEnabled ? 'rgba(0, 255, 204, 0.2)' : '#222';
             editorCtx.setLineDash([5, 5]);
             editorCtx.beginPath();
-            editorCtx.moveTo(140, 0); editorCtx.lineTo(140, 200);
-            editorCtx.moveTo(0, 100); editorCtx.lineTo(280, 100);
+            editorCtx.moveTo(centerX, 0); editorCtx.lineTo(centerX, editorCanvas.height);
             editorCtx.stroke();
             editorCtx.setLineDash([]);
 
-            drawSkeleton(editorCtx, blueprintBones, 140, 100, -Math.PI / 2, 0, true); 
+            drawSkeleton(editorCtx, blueprintBones, centerX, 100, -Math.PI / 2, 0, true); 
         }
 
         function loop() {
