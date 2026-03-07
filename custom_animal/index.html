@@ -163,25 +163,46 @@
             if (Math.hypot(lx - parent.localX, ly - parent.localY) < 5) return;
 
             const id = Date.now();
-            const createBone = (pId, x, y, isMirror = false, mId = null) => {
+            const finalLX = Math.abs(lx) < 5 ? 0 : lx;
+            const isOnAxis = finalLX === 0;
+
+            const createBone = (pId, x, y, isMirror = false, mId = null, mergePId = null) => {
                 const p = blueprintBones.find(b => b.id === pId);
-                const relAngle = Math.atan2(y - p.localY, x - p.localX) - (isMirror ? -p.relAngle : p.relAngle);
                 const absAngle = Math.atan2(y - p.localY, x - p.localX);
-                return { id: isMirror ? id + 1 : id, parentId: pId, length: Math.hypot(x - p.localX, y - p.localY), relAngle: absAngle, type: selectedType, phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), isMirror, isOnAxis: Math.abs(x) < 5 && !isMirror, localX: x, localY: y, mirrorId: mId };
+                return { 
+                    id: isMirror ? id + 1 : id, 
+                    parentId: pId, 
+                    mergeParentId: mergePId, 
+                    length: Math.hypot(x - p.localX, y - p.localY), 
+                    relAngle: absAngle, 
+                    type: selectedType, 
+                    phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), 
+                    isMirror, 
+                    isOnAxis: x === 0, 
+                    localX: x, 
+                    localY: y, 
+                    mirrorId: mId 
+                };
             };
 
-            const finalLX = Math.abs(lx) < 5 ? 0 : lx;
-            const newBone = createBone(parent.id, finalLX, ly);
-            
-            if (symmetryEnabled && Math.abs(finalLX) >= 5) {
+            if (symmetryEnabled && isOnAxis && parent.mirrorId !== null) {
+                const mergeBone = createBone(parent.id, 0, ly, false, null, parent.mirrorId);
+                blueprintBones.push(mergeBone);
+                selectedBoneId = mergeBone.id;
+            } 
+            else if (symmetryEnabled && !isOnAxis) {
                 const mPId = (parent.mirrorId !== null) ? parent.mirrorId : parent.id;
+                const newBone = createBone(parent.id, finalLX, ly);
                 const mirrorBone = createBone(mPId, -finalLX, ly, true, newBone.id);
                 newBone.mirrorId = mirrorBone.id;
                 blueprintBones.push(newBone, mirrorBone);
+                selectedBoneId = newBone.id;
             } else {
+                const newBone = createBone(parent.id, finalLX, ly);
                 blueprintBones.push(newBone);
+                selectedBoneId = newBone.id;
             }
-            selectedBoneId = newBone.id; updateBoneList();
+            updateBoneList();
         }
 
         function updateBoneList() {
@@ -189,7 +210,8 @@
             blueprintBones.forEach((b, i) => {
                 const div = document.createElement('div'); div.className = `bone-item ${b.id === selectedBoneId ? 'selected' : ''}`;
                 const typeMap = { 'head': '머리', 'moving': '관절', 'garment': '장식' };
-                div.innerHTML = `<span>[${i}] ${typeMap[b.type]}</span> <span>길이: ${Math.round(b.length)}</span>`;
+                const suffix = b.mergeParentId !== null ? ' (병합)' : '';
+                div.innerHTML = `<span>[${i}] ${typeMap[b.type]}${suffix}</span> <span>길이: ${Math.round(b.length)}</span>`;
                 div.onclick = (e) => { e.stopPropagation(); selectedBoneId = b.id; updateBoneList(); };
                 boneListEl.appendChild(div);
             });
@@ -251,6 +273,17 @@
                 if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
                 targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1) * (isEditor ? editorView.zoom : 1);
                 targetCtx.beginPath(); targetCtx.moveTo(parent.x, parent.y); targetCtx.lineTo(ex, ey); targetCtx.stroke();
+                
+                // 병합 연결선 추가 렌더링
+                if (bone.mergeParentId !== null) {
+                    const secondParent = bonePositions.get(bone.mergeParentId);
+                    if (secondParent) {
+                        targetCtx.beginPath(); 
+                        targetCtx.moveTo(secondParent.x, secondParent.y); 
+                        targetCtx.lineTo(ex, ey); 
+                        targetCtx.stroke();
+                    }
+                }
                 targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : (bone.type === 'moving' ? '#00ffcc' : '#555');
                 targetCtx.beginPath(); targetCtx.arc(ex, ey, 2.5 * (isEditor ? editorView.zoom : 1), 0, Math.PI*2); targetCtx.fill();
                 bonePositions.set(bone.id, { x: ex, y: ey, angle: worldAngle });
