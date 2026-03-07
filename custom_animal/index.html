@@ -329,8 +329,8 @@
 
             // Ripple Update
             animal.ripples.forEach((r, i) => {
-                r.r += r.p * 3;
-                r.a *= 0.94;
+                r.r += r.p * 1.2; // 확산 속도 대폭 하향 (3 -> 1.2)
+                r.a *= 0.96; // 조금 더 천천히 소멸 (0.94 -> 0.96)
                 if (r.a < 0.01) animal.ripples.splice(i, 1);
             });
 
