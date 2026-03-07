@@ -35,6 +35,30 @@
         h1 { font-size: 14px; font-weight: 200; letter-spacing: 3px; margin-bottom: 30px; color: var(--accent); }
         .controls { display: flex; flex-direction: column; gap: 15px; }
         .control-group { background: #222; padding: 15px; border-radius: 10px; font-size: 11px; }
+        #editor-canvas-container {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border: 1px dashed #444;
+            margin-bottom: 15px;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #apply-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #000;
+            font-weight: bold;
+            border: none;
+            margin-top: 10px;
+            letter-spacing: 2px;
+        }
+        #apply-btn:hover {
+            filter: brightness(1.2);
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+        }
         .label { opacity: 0.5; margin-bottom: 8px; display: block; }
         button { 
             background: #333; border: 1px solid #444; color: #eee; padding: 8px; cursor: pointer; border-radius: 5px; font-family: inherit; font-size: 11px;
@@ -59,7 +83,12 @@
     <div id="editor-panel">
         <h1>CUSTOM ANIMAL<br>GENETIC LAB</h1>
         
+        <div id="editor-canvas-container">
+            <canvas id="editor-canvas"></canvas>
+        </div>
+
         <div class="controls">
+            <button id="apply-btn">APPLY TO WORLD</button>
             <div class="control-group">
                 <span class="label">ADD PART (CLICK HEAD TO START)</span>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
@@ -98,9 +127,12 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const editorCanvas = document.getElementById('editor-canvas');
+        const editorCtx = editorCanvas.getContext('2d');
         const boneListEl = document.getElementById('bone-list');
         const speedSlider = document.getElementById('speed-slider');
         const speedValEl = document.getElementById('speed-val');
+        const applyBtn = document.getElementById('apply-btn');
         
         let width, height;
         let mouseX = 0, mouseY = 0;
@@ -115,6 +147,9 @@
         let selectedType = 'moving'; // moving, garment
         let symmetryEnabled = false;
         let speedMultiplier = 1.0;
+        let blueprintBones = [
+            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0 }
+        ];
         
         // Speed Slider Event
         speedSlider.oninput = (e) => {
@@ -129,16 +164,17 @@
             angle: 0,
             targetAngle: 0,
             speed: 0,
-            bones: [], // { parentIdx, length, angleOffset, type, phase, symmetryId }
+            bones: [],
             ripples: []
         };
 
         // Initialize Head
         function initAnimal() {
             animal.pos = { x: (window.innerWidth - 320) / 2 + 320, y: window.innerHeight / 2 };
-            animal.bones = [
+            blueprintBones = [
                 { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0 }
             ];
+            animal.bones = JSON.parse(JSON.stringify(blueprintBones));
             updateBoneList();
         }
 
@@ -147,6 +183,8 @@
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
+            editorCanvas.width = 280;
+            editorCanvas.height = 200;
         }
 
         window.addEventListener('resize', resize);
@@ -176,6 +214,12 @@
             mouseY = e.clientY;
         });
 
+        applyBtn.onclick = () => {
+            animal.bones = JSON.parse(JSON.stringify(blueprintBones));
+            applyBtn.innerText = 'APPLIED!';
+            setTimeout(() => applyBtn.innerText = 'APPLY TO WORLD', 1000);
+        };
+
         // Editor Logic
         document.getElementById('add-move-btn').onclick = () => {
             selectedType = 'moving';
@@ -194,37 +238,32 @@
         };
         document.getElementById('reset-btn').onclick = () => initAnimal();
 
-        canvas.addEventListener('click', e => {
-            // Editor Area Interaction (Simplification: Just click to add to the last bone)
-            if (e.clientX < 320 + 300 && e.clientY < 400) {
-                addBone();
-            }
-        });
+        editorCanvas.onclick = () => addBone();
 
         function addBone() {
-            const parentIdx = animal.bones.length - 1;
+            const parentIdx = blueprintBones.length - 1;
             const id = Date.now();
             const angle = (Math.random() - 0.5) * Math.PI;
             
             const newBone = {
                 id: id,
-                parentId: animal.bones[parentIdx].id,
-                length: 40 + Math.random() * 40,
+                parentId: blueprintBones[parentIdx].id,
+                length: 25 + Math.random() * 30,
                 angle: angle,
                 currentAngle: angle,
                 type: selectedType,
                 phase: Math.random() * Math.PI * 2
             };
             
-            animal.bones.push(newBone);
+            blueprintBones.push(newBone);
             
             if (symmetryEnabled) {
-                animal.bones.push({
+                blueprintBones.push({
                     ...newBone,
                     id: id + 1,
                     angle: -angle,
                     currentAngle: -angle,
-                    phase: newBone.phase + Math.PI // Opposite phase for walk
+                    phase: newBone.phase + Math.PI
                 });
             }
             updateBoneList();
@@ -232,7 +271,7 @@
 
         function updateBoneList() {
             boneListEl.innerHTML = '<div class="label">SKELETON DATA:</div>';
-            animal.bones.forEach((b, i) => {
+            blueprintBones.forEach((b, i) => {
                 const div = document.createElement('div');
                 div.className = 'bone-item';
                 div.innerHTML = `<span>[${i}] ${b.type.toUpperCase()}</span> <span>LEN: ${Math.round(b.length)}</span>`;
@@ -282,48 +321,25 @@
             });
         }
 
-        function draw() {
-            ctx.fillStyle = 'rgba(10, 10, 10, 0.4)';
-            ctx.fillRect(0, 0, width, height);
-
-            // Draw Ripples (Enhanced Visual Feedback)
-            animal.ripples.forEach(r => {
-                // Outer Ring
-                ctx.lineWidth = 2 + r.a * 3;
-                ctx.strokeStyle = `rgba(${r.color}, ${r.a})`;
-                ctx.beginPath();
-                ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Core Burst (Center visualization for recording)
-                ctx.fillStyle = `rgba(${r.color}, ${r.a * 0.7})`;
-                ctx.beginPath();
-                ctx.arc(r.x, r.y, 5 * r.a, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Calculate & Draw Skeleton
-            const time = performance.now() * 0.005 * speedMultiplier;
+        function drawSkeleton(targetCtx, bones, x, y, baseAngle, timeScale = 0) {
             const bonePositions = new Map();
-            
-            animal.bones.forEach(bone => {
+            const time = performance.now() * 0.005 * timeScale;
+
+            bones.forEach(bone => {
                 if (bone.type === 'head') {
-                    bonePositions.set(bone.id, { x: animal.pos.x, y: animal.pos.y, angle: animal.angle });
-                    // Draw Head
-                    ctx.fillStyle = varColor();
-                    ctx.beginPath();
-                    ctx.arc(animal.pos.x, animal.pos.y, 6, 0, Math.PI * 2);
-                    ctx.fill();
+                    bonePositions.set(bone.id, { x: x, y: y, angle: baseAngle });
+                    targetCtx.fillStyle = '#00ffcc';
+                    targetCtx.beginPath();
+                    targetCtx.arc(x, y, 5, 0, Math.PI * 2);
+                    targetCtx.fill();
                     return;
                 }
 
                 const parent = bonePositions.get(bone.parentId);
                 if (!parent) return;
 
-                // Progressive Motion Logic
                 let animationOffset = 0;
-                if (bone.type === 'moving') {
-                    // Gait: Sine wave based on speed and global time
+                if (bone.type === 'moving' && timeScale > 0) {
                     animationOffset = Math.sin(time * (1 + animal.speed * 0.5) + bone.phase) * (0.2 + animal.speed * 0.1);
                 }
 
@@ -331,25 +347,47 @@
                 const ex = parent.x + Math.cos(worldAngle) * bone.length;
                 const ey = parent.y + Math.sin(worldAngle) * bone.length;
 
-                // Draw Bone
-                ctx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
-                ctx.lineWidth = bone.type === 'moving' ? 2 : 1;
-                ctx.beginPath();
-                ctx.moveTo(parent.x, parent.y);
-                ctx.lineTo(ex, ey);
-                ctx.stroke();
+                targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+                targetCtx.lineWidth = bone.type === 'moving' ? 2 : 1;
+                targetCtx.beginPath();
+                targetCtx.moveTo(parent.x, parent.y);
+                targetCtx.lineTo(ex, ey);
+                targetCtx.stroke();
 
-                // Joint Circle
-                ctx.fillStyle = bone.type === 'moving' ? '#00ffcc' : '#555';
-                ctx.beginPath();
-                ctx.arc(ex, ey, 3, 0, Math.PI * 2);
-                ctx.fill();
+                targetCtx.fillStyle = bone.type === 'moving' ? '#00ffcc' : '#555';
+                targetCtx.beginPath();
+                targetCtx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+                targetCtx.fill();
 
                 bonePositions.set(bone.id, { x: ex, y: ey, angle: worldAngle });
             });
         }
 
-        function varColor() { return '#00ffcc'; }
+        function draw() {
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.4)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw World Ripples
+            animal.ripples.forEach(r => {
+                ctx.lineWidth = 2 + r.a * 3;
+                ctx.strokeStyle = `rgba(${r.color}, ${r.a})`;
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = `rgba(${r.color}, ${r.a * 0.7})`;
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, 5 * r.a, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw World Animal
+            drawSkeleton(ctx, animal.bones, animal.pos.x, animal.pos.y, animal.angle, speedMultiplier);
+
+            // Draw Editor Blueprint
+            editorCtx.fillStyle = '#000';
+            editorCtx.fillRect(0, 0, 280, 200);
+            drawSkeleton(editorCtx, blueprintBones, 140, 100, -Math.PI / 2, 0); 
+        }
 
         function loop() {
             update();
@@ -360,15 +398,17 @@
         initAnimal();
         loop();
         
-        // Initial build - some starter bones
+        // Initial build
         setTimeout(() => {
             selectedType = 'moving';
             symmetryEnabled = true;
-            addBone(); // Legs 1
-            addBone(); // Legs 2
-            symmetryEnabled = false;
+            addBone();
+            addBone();
             selectedType = 'garment';
-            addBone(); // Tail
+            symmetryEnabled = false;
+            addBone();
+            // 자동 적용
+            animal.bones = JSON.parse(JSON.stringify(blueprintBones));
         }, 100);
 
     </script>
