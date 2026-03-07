@@ -387,15 +387,18 @@
             const px = parent.computedX;
             const py = parent.computedY;
             
-            const dx = targetX - px;
+            // 중앙 축 흡착 로직 (10px 이내면 중앙으로 강제 고정)
+            const snapThreshold = 10;
+            const isOnAxis = Math.abs(targetX - centerX) < snapThreshold;
+            const finalX = isOnAxis ? centerX : targetX;
+            
+            const dx = finalX - px;
             const dy = targetY - py;
             const dist = Math.hypot(dx, dy);
             if (dist < 10) return;
 
-            // 로컬 좌표계로 변환 (부모 기준)
             const id = Date.now();
             
-            // 뼈대 생성 함수
             const createNewBone = (pId, x, y, isMirror = false) => {
                 const p = blueprintBones.find(b => b.id === pId);
                 const relDx = x - p.computedX;
@@ -406,25 +409,26 @@
                     id: isMirror ? id + 1 : id,
                     parentId: pId,
                     length: Math.hypot(relDx, relDy),
-                    angle: relAngle, // 에디터에서는 절대각, 월드에서는 상대각으로 해석됨
+                    angle: relAngle,
                     type: selectedType,
                     phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0),
-                    isMirror: isMirror
+                    isMirror: isMirror,
+                    isOnAxis: isOnAxis && !isMirror // 중앙 축 여부 저장
                 };
             };
 
-            const newBone = createNewBone(parent.id, targetX, targetY);
+            const newBone = createNewBone(parent.id, finalX, targetY);
             blueprintBones.push(newBone);
 
-            if (symmetryEnabled) {
+            // 대칭 모드이며, 현재 클릭이 중앙 축 위가 아닐 때만 미러 노드 생성
+            if (symmetryEnabled && !isOnAxis) {
                 let mirrorParentId = parent.id;
-                // 부모가 mirror 상태라면 짝을 찾아 연결
-                if (parent.parentId !== null) {
+                if (parent.parentId !== null && !parent.isOnAxis) {
                     const mirrorParent = blueprintBones.find(b => b.parentId === parent.parentId && b.id !== parent.id && b.isMirror !== parent.isMirror);
                     if (mirrorParent) mirrorParentId = mirrorParent.id;
                 }
 
-                const mirrorX = centerX - (targetX - centerX);
+                const mirrorX = centerX - (finalX - centerX);
                 const mirrorBone = createNewBone(mirrorParentId, mirrorX, targetY, true);
                 blueprintBones.push(mirrorBone);
             }
@@ -554,7 +558,8 @@
                     // 월드에서는 부모 각도 + (저장된 각 - 초기 상태 각) + 애니메이션
                     let animationOffset = 0;
                     if (bone.type === 'moving' && timeScale > 0) {
-                        animationOffset = Math.sin(time * (1 + animal.speed * 0.5) + bone.phase) * (0.2 + animal.speed * 0.1);
+                        const amplitude = bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1);
+                        animationOffset = Math.sin(time * (1 + animal.speed * 0.5) + bone.phase) * amplitude;
                     }
                     // bone.angle - (-Math.PI/2) : 에디터의 기본 정렬(위쪽) 대비 상대각 계산
                     worldAngle = parent.angle + (bone.angle - (-Math.PI / 2)) + animationOffset;
