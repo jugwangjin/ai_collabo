@@ -160,20 +160,25 @@
             const rect = editorCanvas.getBoundingClientRect();
             const ex = (clientX - rect.left) * (editorCanvas.width / rect.width), ey = (clientY - rect.top) * (editorCanvas.height / rect.height);
             const lx = (ex - editorView.x) / editorView.zoom, ly = (ey - editorView.y) / editorView.zoom;
-            if (Math.hypot(lx - parent.localX, ly - parent.localY) < 5) return;
+            
+            // 중앙 축 흡착 감지 (가로 위치만 보정)
+            const isTargetOnAxis = Math.abs(lx) < 5;
+            const finalLX = isTargetOnAxis ? 0 : lx;
+            
+            const dx = finalLX - parent.localX; const dy = ly - parent.localY;
+            if (Math.hypot(dx, dy) < 5) return;
 
             const id = Date.now();
-            const finalLX = Math.abs(lx) < 5 ? 0 : lx;
-            const isOnAxis = finalLX === 0;
-
             const createBone = (pId, x, y, isMirror = false, mId = null, mergePId = null) => {
                 const p = blueprintBones.find(b => b.id === pId);
+                // 중요: x, y는 이미 보정된(finalLX 등) 좌표여야 함
+                const dist = Math.hypot(x - p.localX, y - p.localY);
                 const absAngle = Math.atan2(y - p.localY, x - p.localX);
                 return { 
                     id: isMirror ? id + 1 : id, 
                     parentId: pId, 
                     mergeParentId: mergePId, 
-                    length: Math.hypot(x - p.localX, y - p.localY), 
+                    length: dist, 
                     relAngle: absAngle, 
                     type: selectedType, 
                     phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), 
@@ -185,12 +190,12 @@
                 };
             };
 
-            if (symmetryEnabled && isOnAxis && parent.mirrorId !== null) {
+            if (symmetryEnabled && isTargetOnAxis && parent.mirrorId !== null) {
                 const mergeBone = createBone(parent.id, 0, ly, false, null, parent.mirrorId);
                 blueprintBones.push(mergeBone);
                 selectedBoneId = mergeBone.id;
             } 
-            else if (symmetryEnabled && !isOnAxis) {
+            else if (symmetryEnabled && !isTargetOnAxis) {
                 const mPId = (parent.mirrorId !== null) ? parent.mirrorId : parent.id;
                 const newBone = createBone(parent.id, finalLX, ly);
                 const mirrorBone = createBone(mPId, -finalLX, ly, true, newBone.id);
@@ -269,9 +274,12 @@
                 const ey = isEditor ? bone.localY * editorView.zoom + editorView.y : parent.y + Math.sin(worldAngle) * bone.length;
                 bone.computedX = ex; bone.computedY = ey;
 
-                targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+                // 장식 부위는 스스로 움직이지 않지만(animOffset=0), 부모의 움직임은 완벽히 전달함
+                targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(200, 200, 200, 0.6)';
                 if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
-                targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1) * (isEditor ? editorView.zoom : 1);
+                
+                // 장식 부위(Rigid)도 구조적인 중요성을 가지므로 두께를 관절 부위와 맞춤
+                targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1.5) * (isEditor ? editorView.zoom : 1);
                 targetCtx.beginPath(); targetCtx.moveTo(parent.x, parent.y); targetCtx.lineTo(ex, ey); targetCtx.stroke();
                 
                 // 병합 연결선 추가 렌더링
