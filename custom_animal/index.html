@@ -165,7 +165,8 @@
             targetAngle: 0,
             speed: 0,
             bones: [],
-            ripples: []
+            ripples: [],
+            bgParticles: []
         };
 
         // Initialize Head
@@ -176,6 +177,19 @@
             ];
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
             updateBoneList();
+            
+            // 초기 입자 생성
+            animal.bgParticles = [];
+            for(let i=0; i<80; i++) {
+                animal.bgParticles.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    size: Math.random() * 3 + 1,
+                    alpha: Math.random() * 0.15 + 0.05
+                });
+            }
         }
 
         function resize() {
@@ -319,6 +333,16 @@
                 r.a *= 0.94;
                 if (r.a < 0.01) animal.ripples.splice(i, 1);
             });
+
+            // BG Particle Update
+            animal.bgParticles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+            });
         }
 
         function drawSkeleton(targetCtx, bones, x, y, baseAngle, timeScale = 0) {
@@ -366,6 +390,14 @@
         function draw() {
             ctx.fillStyle = 'rgba(10, 10, 10, 0.4)';
             ctx.fillRect(0, 0, width, height);
+
+            // Draw Background Particles
+            animal.bgParticles.forEach(p => {
+                ctx.fillStyle = `rgba(200, 200, 200, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
             // Draw World Ripples
             animal.ripples.forEach(r => {
