@@ -5,46 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>커스텀 애니멀: 유전학 실험실</title>
     <style>
-        :root {
-            --bg: #0a0a0a;
-            --accent: #00ffcc;
-            --editor-bg: #151515;
-        }
+        :root { --bg: #0a0a0a; --accent: #00ffcc; --editor-bg: #151515; }
         body { margin: 0; background: var(--bg); color: #fff; font-family: 'Pretendard', sans-serif; overflow: hidden; display: flex; }
-        
-        #editor-panel {
-            width: 320px; min-width: 250px; max-width: 600px; height: 100vh;
-            background: var(--editor-bg); display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; z-index: 100;
-            overflow-y: auto; overflow-x: hidden;
-        }
+        #editor-panel { width: 320px; min-width: 250px; max-width: 600px; height: 100vh; background: var(--editor-bg); display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; z-index: 100; overflow-y: auto; overflow-x: hidden; }
         #resizer { width: 6px; height: 100vh; background: #222; cursor: col-resize; transition: background 0.2s; z-index: 110; flex-shrink: 0; }
         #resizer:hover, #resizer.dragging { background: var(--accent); }
-        
         #world { flex: 1; height: 100vh; position: relative; min-width: 0; }
-        
         h1 { font-size: 14px; font-weight: 200; letter-spacing: 3px; margin-bottom: 30px; color: var(--accent); flex-shrink: 0; }
         .controls { display: flex; flex-direction: column; gap: 15px; flex-shrink: 0; }
         .control-group { background: #222; padding: 15px; border-radius: 10px; font-size: 11px; }
-        
-        #editor-canvas-container {
-            width: 100%; height: 400px; min-height: 200px; background: #000; border: 1px dashed #444;
-            margin-bottom: 0; position: relative; border-radius: 10px 10px 0 0; overflow: hidden; flex-shrink: 0; cursor: crosshair;
-        }
+        #editor-canvas-container { width: 100%; height: 400px; min-height: 200px; background: #000; border: 1px dashed #444; margin-bottom: 0; position: relative; border-radius: 10px 10px 0 0; overflow: hidden; flex-shrink: 0; cursor: crosshair; }
         #editor-v-resizer { width: 100%; height: 8px; background: #222; cursor: row-resize; margin-bottom: 15px; border-radius: 0 0 10px 10px; transition: background 0.2s; }
         #editor-v-resizer:hover, #editor-v-resizer.dragging { background: var(--accent); }
-        
         #apply-btn { width: 100%; padding: 12px; background: var(--accent); color: #000; font-weight: bold; border: none; margin-top: 10px; letter-spacing: 2px; cursor: pointer; }
         #apply-btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(0, 255, 204, 0.4); }
-        
         .label { opacity: 0.5; margin-bottom: 8px; display: block; }
         button { background: #333; border: 1px solid #444; color: #eee; padding: 8px; cursor: pointer; border-radius: 5px; font-family: inherit; font-size: 11px; transition: all 0.2s; }
         button:hover { background: var(--accent); color: #000; border-color: var(--accent); }
         button.active { background: var(--accent); color: #000; }
-        
         .bone-list { margin-top: 20px; flex: 1; overflow-y: auto; font-size: 10px; opacity: 0.7; }
         .bone-item { padding: 5px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .bone-item.selected { background: rgba(0, 255, 204, 0.2); border-left: 2px solid var(--accent); }
-        
         canvas { display: block; width: 100%; height: 100%; }
         .editor-help { font-size: 9px; color: #888; margin-top: 10px; line-height: 1.4; margin-bottom: 10px; }
         .instructions { position: absolute; bottom: 30px; right: 30px; font-size: 11px; opacity: 0.3; text-align: right; pointer-events: none; }
@@ -52,7 +33,6 @@
     </style>
 </head>
 <body>
-
     <div id="editor-panel">
         <h1>커스텀 애니멀<br>유전학 실험실</h1>
         <div id="editor-canvas-container"><canvas id="editor-canvas"></canvas></div>
@@ -131,12 +111,12 @@
         const soundLeft = new Audio('left.mp3'), soundRight = new Audio('right.mp3');
         let selectedType = 'moving', symmetryEnabled = false, speedMultiplier = 1.0, selectedBoneId = 0;
         let blueprintBones = [{ id: 0, parentId: null, length: 0, relAngle: -Math.PI/2, type: 'head', phase: 0, localX: 0, localY: 0, mirrorId: null, isOnAxis: true }];
-        const animal = { pos: { x: 0, y: 0 }, angle: 0, targetAngle: 0, speed: 0, walkPhase: 0, bones: [], ripples: [], bgParticles: [] };
+        const animal = { pos: { x: 0, y: 0 }, angle: 0, targetAngle: 0, speed: 0, walkPhase: 0, bones: [], ripples: [], bgParticles: [], spineAngles: new Map() };
 
         function initAnimal() {
             animal.pos = { x: (window.innerWidth - 320) / 2 + 320, y: window.innerHeight / 2 };
             blueprintBones = [{ id: 0, parentId: null, length: 0, relAngle: -Math.PI/2, type: 'head', phase: 0, localX: 0, localY: 0, mirrorId: null, isOnAxis: true }];
-            selectedBoneId = 0; animal.bones = JSON.parse(JSON.stringify(blueprintBones));
+            selectedBoneId = 0; animal.bones = JSON.parse(JSON.stringify(blueprintBones)); animal.spineAngles.clear();
             animal.bgParticles = []; for(let i=0; i<80; i++) animal.bgParticles.push({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4, size: Math.random()*3+1, alpha: Math.random()*0.15+0.05 });
             updateBoneList();
         }
@@ -146,32 +126,8 @@
             canvas.width = width; canvas.height = height; editorCanvas.width = panelW - 40; editorCanvas.height = editorCanvasContainer.offsetHeight;
         }
 
-        applyBtn.onclick = () => { animal.bones = JSON.parse(JSON.stringify(blueprintBones)); applyBtn.innerText = '적용 완료!'; setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000); };
-        deleteBtn.onclick = () => {
-            if (blueprintBones.length > 1) {
-                const last = blueprintBones.pop();
-                // 대칭 짝이 있다면 함께 삭제
-                if (last.mirrorId !== null) {
-                    const mirrorIdx = blueprintBones.findIndex(b => b.id === last.mirrorId);
-                    if (mirrorIdx !== -1) blueprintBones.splice(mirrorIdx, 1);
-                }
-                // 삭제 후 고아가 된 자식 노드들도 연쇄적으로 삭제
-                const cleanupChildren = (pId) => {
-                    for (let i = blueprintBones.length - 1; i >= 0; i--) {
-                        if (blueprintBones[i].parentId === pId) {
-                            const childId = blueprintBones[i].id;
-                            blueprintBones.splice(i, 1);
-                            cleanupChildren(childId);
-                        }
-                    }
-                };
-                cleanupChildren(last.id);
-                if (last.mirrorId !== null) cleanupChildren(last.mirrorId);
-
-                selectedBoneId = 0; 
-                updateBoneList();
-            }
-        };
+        applyBtn.onclick = () => { animal.bones = JSON.parse(JSON.stringify(blueprintBones)); animal.spineAngles.clear(); applyBtn.innerText = '적용 완료!'; setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000); };
+        deleteBtn.onclick = () => { if (blueprintBones.length > 1) { const last = blueprintBones.pop(); if (last.mirrorId !== null) { const idx = blueprintBones.findIndex(b => b.id === last.mirrorId); if (idx !== -1) blueprintBones.splice(idx, 1); } selectedBoneId = 0; updateBoneList(); } };
         speedSlider.oninput = (e) => { speedMultiplier = parseFloat(e.target.value); speedValEl.innerText = speedMultiplier.toFixed(1); };
         
         document.getElementById('add-move-btn').onclick = () => { selectedType = 'moving'; document.getElementById('add-move-btn').className = 'active'; document.getElementById('add-garment-btn').className = ''; };
@@ -181,56 +137,18 @@
 
         function addBoneAt(clientX, clientY) {
             const parent = blueprintBones.find(b => b.id === selectedBoneId); if (!parent) return;
-            const rect = editorCanvas.getBoundingClientRect();
-            const ex = (clientX - rect.left) * (editorCanvas.width / rect.width), ey = (clientY - rect.top) * (editorCanvas.height / rect.height);
+            const rect = editorCanvas.getBoundingClientRect(), ex = (clientX - rect.left) * (editorCanvas.width / rect.width), ey = (clientY - rect.top) * (editorCanvas.height / rect.height);
             const lx = (ex - editorView.x) / editorView.zoom, ly = (ey - editorView.y) / editorView.zoom;
-            
-            // 중앙 축 흡착 감지 (가로 위치만 보정)
-            const isTargetOnAxis = Math.abs(lx) < 5;
-            const finalLX = isTargetOnAxis ? 0 : lx;
-            
-            const dx = finalLX - parent.localX; const dy = ly - parent.localY;
-            if (Math.hypot(dx, dy) < 5) return;
-
+            if (Math.hypot(lx - parent.localX, ly - parent.localY) < 5) return;
             const id = Date.now();
             const createBone = (pId, x, y, isMirror = false, mId = null, mergePId = null) => {
-                const p = blueprintBones.find(b => b.id === pId);
-                // 중요: x, y는 이미 보정된(finalLX 등) 좌표여야 함
-                const dist = Math.hypot(x - p.localX, y - p.localY);
-                const absAngle = Math.atan2(y - p.localY, x - p.localX);
-                return { 
-                    id: isMirror ? id + 1 : id, 
-                    parentId: pId, 
-                    mergeParentId: mergePId, 
-                    length: dist, 
-                    relAngle: absAngle, 
-                    type: selectedType, 
-                    phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), 
-                    isMirror, 
-                    isOnAxis: x === 0, 
-                    localX: x, 
-                    localY: y, 
-                    mirrorId: mId 
-                };
+                const p = blueprintBones.find(b => b.id === pId), dist = Math.hypot(x - p.localX, y - p.localY), absAngle = Math.atan2(y - p.localY, x - p.localX);
+                return { id: isMirror ? id + 1 : id, parentId: pId, mergeParentId: mergePId, length: dist, relAngle: absAngle, type: selectedType, phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), isMirror, isOnAxis: x === 0, localX: x, localY: y, mirrorId: mId };
             };
-
-            if (symmetryEnabled && isTargetOnAxis && parent.mirrorId !== null) {
-                const mergeBone = createBone(parent.id, 0, ly, false, null, parent.mirrorId);
-                blueprintBones.push(mergeBone);
-                selectedBoneId = mergeBone.id;
-            } 
-            else if (symmetryEnabled && !isTargetOnAxis) {
-                const mPId = (parent.mirrorId !== null) ? parent.mirrorId : parent.id;
-                const newBone = createBone(parent.id, finalLX, ly);
-                const mirrorBone = createBone(mPId, -finalLX, ly, true, newBone.id);
-                newBone.mirrorId = mirrorBone.id;
-                blueprintBones.push(newBone, mirrorBone);
-                selectedBoneId = newBone.id;
-            } else {
-                const newBone = createBone(parent.id, finalLX, ly);
-                blueprintBones.push(newBone);
-                selectedBoneId = newBone.id;
-            }
+            const finalLX = Math.abs(lx) < 5 ? 0 : lx;
+            if (symmetryEnabled && finalLX === 0 && parent.mirrorId !== null) { const mergeBone = createBone(parent.id, 0, ly, false, null, parent.mirrorId); blueprintBones.push(mergeBone); selectedBoneId = mergeBone.id; } 
+            else if (symmetryEnabled && finalLX !== 0) { const mPId = (parent.mirrorId !== null) ? parent.mirrorId : parent.id; const newBone = createBone(parent.id, finalLX, ly); const mirrorBone = createBone(mPId, -finalLX, ly, true, newBone.id); newBone.mirrorId = mirrorBone.id; blueprintBones.push(newBone, mirrorBone); selectedBoneId = newBone.id; } 
+            else { const newBone = createBone(parent.id, finalLX, ly); blueprintBones.push(newBone); selectedBoneId = newBone.id; }
             updateBoneList();
         }
 
@@ -238,11 +156,9 @@
             boneListEl.innerHTML = '<div class="label">골격 데이터:</div>';
             blueprintBones.forEach((b, i) => {
                 const div = document.createElement('div'); div.className = `bone-item ${b.id === selectedBoneId ? 'selected' : ''}`;
-                const typeMap = { 'head': '머리', 'moving': '관절', 'garment': '장식' };
-                const suffix = b.mergeParentId !== null ? ' (병합)' : '';
+                const typeMap = { 'head': '머리', 'moving': '관절', 'garment': '장식' }; const suffix = b.mergeParentId !== null ? ' (병합)' : '';
                 div.innerHTML = `<span>[${i}] ${typeMap[b.type]}${suffix}</span> <span>길이: ${Math.round(b.length)}</span>`;
-                div.onclick = (e) => { e.stopPropagation(); selectedBoneId = b.id; updateBoneList(); };
-                boneListEl.appendChild(div);
+                div.onclick = (e) => { e.stopPropagation(); selectedBoneId = b.id; updateBoneList(); }; boneListEl.appendChild(div);
             });
         }
 
@@ -252,12 +168,8 @@
             if (isMouseDown) {
                 rippleTimer++; if (rippleTimer % 45 === 0) createRipple(mouseX, mouseY, isRightClick ? 1.5 : 0.8);
                 const dx = mouseX - animal.pos.x, dy = mouseY - animal.pos.y;
-                animal.targetAngle = Math.atan2(dy, dx);
-                const speedTarget = (isRightClick ? 5 : 2) * speedMultiplier;
-                animal.speed += (speedTarget - animal.speed) * 0.05;
-                let diff = animal.targetAngle - animal.angle;
-                while (diff < -Math.PI) diff += Math.PI * 2; while (diff > Math.PI) diff -= Math.PI * 2;
-                animal.angle += diff * 0.05;
+                animal.targetAngle = Math.atan2(dy, dx); const speedTarget = (isRightClick ? 5 : 2) * speedMultiplier; animal.speed += (speedTarget - animal.speed) * 0.05;
+                let diff = animal.targetAngle - animal.angle; while (diff < -Math.PI) diff += Math.PI * 2; while (diff > Math.PI) diff -= Math.PI * 2; animal.angle += diff * 0.035;
                 if (Math.hypot(dx, dy) > 10) { animal.pos.x += Math.cos(animal.angle) * animal.speed; animal.pos.y += Math.sin(animal.angle) * animal.speed; }
             } else { animal.speed *= 0.95; animal.pos.x += Math.cos(animal.angle) * animal.speed; animal.pos.y += Math.sin(animal.angle) * animal.speed; }
             animal.ripples.forEach((r, i) => { r.r += r.p * 0.8; r.a *= 0.95; if (r.a < 0.01) animal.ripples.splice(i, 1); });
@@ -266,7 +178,7 @@
                 p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy *= 0.97; p.vx += (Math.random()-0.5)*0.02; p.vy += (Math.random()-0.5)*0.02;
                 if (p.x < 0) p.x = width; if (p.x > width) p.x = 0; if (p.y < 0) p.y = height; if (p.y > height) p.y = 0;
             });
-            animal.walkPhase += (0.05 + animal.speed * 0.1) * speedMultiplier;
+            animal.walkPhase += (0.025 + animal.speed * 0.05) * speedMultiplier;
         }
 
         function drawSkeleton(targetCtx, bones, startX, startY, baseAngle, timeScale = 0, isEditor = false) {
@@ -276,59 +188,39 @@
                     const sx = isEditor ? bone.localX * editorView.zoom + editorView.x : startX;
                     const sy = isEditor ? bone.localY * editorView.zoom + editorView.y : startY;
                     bone.computedX = sx; bone.computedY = sy;
+                    if (!isEditor) animal.spineAngles.set(bone.id, baseAngle);
                     bonePositions.set(bone.id, { x: sx, y: sy, angle: isEditor ? -Math.PI/2 : baseAngle });
                     targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : '#00ffcc';
-                    targetCtx.beginPath(); targetCtx.arc(sx, sy, 5, 0, Math.PI*2); targetCtx.fill();
-                    return;
+                    targetCtx.beginPath(); targetCtx.arc(sx, sy, 5, 0, Math.PI*2); targetCtx.fill(); return;
                 }
                 const parent = bonePositions.get(bone.parentId); if (!parent) return;
-                
                 let worldAngle;
-                if (isEditor) {
-                    worldAngle = bone.relAngle; 
-                } else {
+                if (isEditor) worldAngle = bone.relAngle;
+                else {
                     let animOffset = 0;
-                    if (bone.type === 'moving' && timeScale > 0) {
-                        const amplitude = bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1);
-                        animOffset = Math.sin(animal.walkPhase + bone.phase) * amplitude;
-                    }
-                    
-                    // 부모의 에디터 당시 절대 각도를 가져옴 (머리는 기본 -PI/2)
-                    const parentBone = blueprintBones.find(b => b.id === bone.parentId);
-                    const parentEditorAngle = (parentBone.type === 'head') ? -Math.PI / 2 : parentBone.relAngle;
-                    
-                    // 설계 당시 부모와 자식 사이의 각도 차이(Delta) 계산
-                    const angleDelta = bone.relAngle - parentEditorAngle;
-                    
-                    // 월드 각도 = 부모의 현재 월드 각도 + 설계상의 차이 + 애니메이션
-                    worldAngle = parent.angle + angleDelta + animOffset;
+                    if (bone.type === 'moving' && timeScale > 0) animOffset = Math.sin(animal.walkPhase + bone.phase) * (bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1));
+                    const pBone = blueprintBones.find(b => b.id === bone.parentId);
+                    const pEditorAngle = (pBone.type === 'head') ? -Math.PI / 2 : pBone.relAngle;
+                    const angleDelta = bone.relAngle - pEditorAngle;
+                    if (bone.isOnAxis && !isEditor) {
+                        const prevSpineAngle = animal.spineAngles.get(bone.id) || parent.angle;
+                        let angleTarget = parent.angle + angleDelta, angleDiff = angleTarget - prevSpineAngle;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2; while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        const newSpineAngle = prevSpineAngle + angleDiff * 0.15;
+                        animal.spineAngles.set(bone.id, newSpineAngle); worldAngle = newSpineAngle + animOffset;
+                    } else worldAngle = parent.angle + angleDelta + animOffset;
                 }
-
                 const ex = isEditor ? bone.localX * editorView.zoom + editorView.x : parent.x + Math.cos(worldAngle) * bone.length;
                 const ey = isEditor ? bone.localY * editorView.zoom + editorView.y : parent.y + Math.sin(worldAngle) * bone.length;
                 bone.computedX = ex; bone.computedY = ey;
-
-                // 장식 부위는 스스로 움직이지 않지만(animOffset=0), 부모의 움직임은 완벽히 전달함
                 targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(200, 200, 200, 0.6)';
                 if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
-                
-                // 장식 부위(Rigid)도 구조적인 중요성을 가지므로 두께를 관절 부위와 맞춤
                 targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1.5) * (isEditor ? editorView.zoom : 1);
                 targetCtx.beginPath(); targetCtx.moveTo(parent.x, parent.y); targetCtx.lineTo(ex, ey); targetCtx.stroke();
-                
-                // 병합 연결선 추가 렌더링
-                if (bone.mergeParentId !== null) {
-                    const secondParent = bonePositions.get(bone.mergeParentId);
-                    if (secondParent) {
-                        targetCtx.beginPath(); 
-                        targetCtx.moveTo(secondParent.x, secondParent.y); 
-                        targetCtx.lineTo(ex, ey); 
-                        targetCtx.stroke();
-                    }
-                }
+                if (bone.mergeParentId !== null) { const sP = bonePositions.get(bone.mergeParentId); if (sP) { targetCtx.beginPath(); targetCtx.moveTo(sP.x, sP.y); targetCtx.lineTo(ex, ey); targetCtx.stroke(); } }
                 targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : (bone.type === 'moving' ? '#00ffcc' : '#555');
                 targetCtx.beginPath(); targetCtx.arc(ex, ey, 2.5 * (isEditor ? editorView.zoom : 1), 0, Math.PI*2); targetCtx.fill();
-                bonePositions.set(bone.id, { x: ex, y: ey, angle: worldAngle });
+                bonePositions.set(bone.id, { x: ex, y: ey, angle: isEditor ? bone.relAngle : worldAngle });
             });
         }
 
@@ -344,7 +236,7 @@
 
         window.addEventListener('resize', resize);
         window.addEventListener('contextmenu', e => { if (e.target === editorCanvas) e.preventDefault(); });
-        canvas.addEventListener('mousedown', e => { isMouseDown = true; isRightClick = e.button === 2; const rect = canvas.getBoundingClientRect(); createRipple(e.clientX - rect.left, e.clientY - rect.top, isRightClick ? 1.5 : 0.8); if (isRightClick) { soundRight.currentTime = 0; soundRight.play(); } else { soundLeft.currentTime = 0; soundLeft.play(); } });
+        canvas.addEventListener('mousedown', e => { isMouseDown = true; isRightClick = e.button === 2; const rect = canvas.getBoundingClientRect(); createRipple(e.clientX - rect.left, e.clientY - rect.top, isRightClick ? 1.5 : 0.8); if (isRightClick) { soundLeft.currentTime = 0; soundRight.play(); } else { soundLeft.currentTime = 0; soundLeft.play(); } });
 
         function loop() { update(); draw(); requestAnimationFrame(loop); }
         initAnimal(); resize(); loop();
