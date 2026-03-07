@@ -24,6 +24,7 @@
             padding: 20px;
             box-sizing: border-box;
             z-index: 100;
+            overflow-y: auto; /* 세로 스크롤 허용 */
             overflow-x: hidden;
         }
         #resizer {
@@ -33,6 +34,7 @@
             cursor: col-resize;
             transition: background 0.2s;
             z-index: 110;
+            flex-shrink: 0;
         }
         #resizer:hover, #resizer.dragging {
             background: var(--accent);
@@ -41,24 +43,25 @@
             flex: 1;
             height: 100vh;
             position: relative;
-            min-width: 0; /* flex container 내부 캔버스 찌그러짐 방지 */
+            min-width: 0;
         }
         
         /* UI */
-        h1 { font-size: 14px; font-weight: 200; letter-spacing: 3px; margin-bottom: 30px; color: var(--accent); }
-        .controls { display: flex; flex-direction: column; gap: 15px; }
+        h1 { font-size: 14px; font-weight: 200; letter-spacing: 3px; margin-bottom: 30px; color: var(--accent); flex-shrink: 0; }
+        .controls { display: flex; flex-direction: column; gap: 15px; flex-shrink: 0; }
         .control-group { background: #222; padding: 15px; border-radius: 10px; font-size: 11px; }
         #editor-canvas-container {
             width: 100%;
-            height: 300px; /* 초기 높이 상향 */
-            min-height: 150px;
-            max-height: 80vh;
+            height: 400px; /* 초기 높이 더 상향 */
+            min-height: 200px;
             background: #000;
             border: 1px dashed #444;
             margin-bottom: 0;
             position: relative;
             border-radius: 10px 10px 0 0;
             overflow: hidden;
+            flex-shrink: 0;
+            cursor: crosshair;
         }
         #editor-v-resizer {
             width: 100%;
@@ -186,6 +189,16 @@
         let isResizingH = false;
         let isResizingV = false;
 
+        // Editor View State (줌/팬)
+        const editorView = {
+            x: 140, // 초기 중심 X
+            y: 150, // 초기 중심 Y
+            zoom: 1.0,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
         // Resizer Logic (Horizontal)
         resizer.onmousedown = (e) => {
             isResizingH = true;
@@ -202,6 +215,48 @@
             e.preventDefault();
         };
 
+        // Editor View Control
+        editorCanvas.onwheel = (e) => {
+            e.preventDefault();
+            const factor = Math.pow(1.1, -e.deltaY / 100);
+            const rect = editorCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const prevZoom = editorView.zoom;
+            editorView.zoom = Math.max(0.2, Math.min(5, editorView.zoom * factor));
+            const actualFactor = editorView.zoom / prevZoom;
+            editorView.x = mx - (mx - editorView.x) * actualFactor;
+            editorView.y = my - (my - editorView.y) * actualFactor;
+        };
+
+        editorCanvas.onmousedown = (e) => {
+            if (e.button === 2 || e.button === 1 || e.altKey) {
+                editorView.isDragging = true;
+                editorView.lastX = e.clientX;
+                editorView.lastY = e.clientY;
+                e.preventDefault();
+                return;
+            }
+            
+            const rect = editorCanvas.getBoundingClientRect();
+            const ex = e.clientX - rect.left;
+            const ey = e.clientY - rect.top;
+
+            // 이미 있는 관절 선택 시도
+            const clickedBone = blueprintBones.find(b => {
+                return Math.hypot(ex - b.computedX, ey - b.computedY) < 15;
+            });
+
+            if (clickedBone) {
+                selectedBoneId = clickedBone.id;
+                updateBoneList();
+                return;
+            }
+
+            addBoneAt(ex, ey);
+        };
+
         window.addEventListener('mousemove', (e) => {
             if (isResizingH) {
                 let newWidth = e.clientX;
@@ -212,10 +267,15 @@
             } else if (isResizingV) {
                 const rect = editorCanvasContainer.getBoundingClientRect();
                 let newHeight = e.clientY - rect.top;
-                if (newHeight >= 150 && newHeight <= window.innerHeight * 0.8) {
+                if (newHeight >= 200) {
                     editorCanvasContainer.style.height = newHeight + 'px';
                     resize();
                 }
+            } else if (editorView.isDragging) {
+                editorView.x += e.clientX - editorView.lastX;
+                editorView.y += e.clientY - editorView.lastY;
+                editorView.lastX = e.clientX;
+                editorView.lastY = e.clientY;
             } else {
                 const rect = canvas.getBoundingClientRect();
                 mouseX = e.clientX - rect.left;
@@ -232,6 +292,7 @@
                 isResizingV = false;
                 editorVResizer.classList.remove('dragging');
             }
+            editorView.isDragging = false;
             document.body.style.cursor = 'default';
             isMouseDown = false;
         });
@@ -240,9 +301,9 @@
         let selectedType = 'moving';
         let symmetryEnabled = false;
         let speedMultiplier = 1.0;
-        let selectedBoneId = 0; // 현재 선택된 부모 ID
+        let selectedBoneId = 0; 
         let blueprintBones = [
-            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, computedX: 140, computedY: 100 }
+            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }
         ];
         
         // Speed Slider Event
@@ -258,7 +319,7 @@
             angle: 0,
             targetAngle: 0,
             speed: 0,
-            walkPhase: 0, // 누적 위상 추가
+            walkPhase: 0, 
             bones: [],
             ripples: [],
             bgParticles: []
@@ -268,9 +329,10 @@
         function initAnimal() {
             animal.pos = { x: (window.innerWidth - 320) / 2 + 320, y: window.innerHeight / 2 };
             blueprintBones = [
-                { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, computedX: 140, computedY: 100 }
+                { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }
             ];
             selectedBoneId = 0;
+            editorView.x = 140; editorView.y = 150; editorView.zoom = 1.0;
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
             updateBoneList();
             
@@ -380,57 +442,52 @@
             addBoneAt(ex, ey);
         };
 
-        function addBoneAt(targetX, targetY) {
+        function addBoneAt(screenX, screenY) {
             const parent = blueprintBones.find(b => b.id === selectedBoneId);
             if (!parent) return;
 
-            const centerX = editorCanvas.width / 2;
-            const px = parent.computedX;
-            const py = parent.computedY;
-            
-            // 중앙 축 흡착 로직 (10px 이내면 중앙으로 강제 고정)
-            const snapThreshold = 10;
-            const isOnAxis = Math.abs(targetX - centerX) < snapThreshold;
-            const finalX = isOnAxis ? centerX : targetX;
-            
-            const dx = finalX - px;
-            const dy = targetY - py;
+            // 스크린 좌표 -> 로컬 좌표 (줌/팬 역산)
+            const targetLocalX = (screenX - editorView.x) / editorView.zoom;
+            const targetLocalY = (screenY - editorView.y) / editorView.zoom;
+
+            const dx = targetLocalX - parent.localX;
+            const dy = targetLocalY - parent.localY;
             const dist = Math.hypot(dx, dy);
-            if (dist < 10) return;
+            if (dist < 5) return;
 
             const id = Date.now();
             
-            const createNewBone = (pId, x, y, isMirror = false) => {
+            const createNewBone = (pId, lx, ly, isMirror = false) => {
                 const p = blueprintBones.find(b => b.id === pId);
-                const relDx = x - p.computedX;
-                const relDy = y - p.computedY;
+                const relDx = lx - p.localX;
+                const relDy = ly - p.localY;
                 const relAngle = Math.atan2(relDy, relDx);
 
                 return {
                     id: isMirror ? id + 1 : id,
                     parentId: pId,
                     length: Math.hypot(relDx, relDy),
-                    angle: relAngle,
+                    angle: relAngle, // 에디터에서는 절대각, 월드에서는 상대각으로 해석됨
                     type: selectedType,
                     phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0),
                     isMirror: isMirror,
-                    isOnAxis: isOnAxis && !isMirror // 중앙 축 여부 저장
+                    isOnAxis: Math.abs(lx) < 5 && !isMirror,
+                    localX: lx,
+                    localY: ly
                 };
             };
 
-            const newBone = createNewBone(parent.id, finalX, targetY);
+            const finalLX = Math.abs(targetLocalX) < 5 ? 0 : targetLocalX; // 중앙 흡착
+            const newBone = createNewBone(parent.id, finalLX, targetLocalY);
             blueprintBones.push(newBone);
 
-            // 대칭 모드이며, 현재 클릭이 중앙 축 위가 아닐 때만 미러 노드 생성
-            if (symmetryEnabled && !isOnAxis) {
+            if (symmetryEnabled && Math.abs(finalLX) >= 5) {
                 let mirrorParentId = parent.id;
                 if (parent.parentId !== null && !parent.isOnAxis) {
                     const mirrorParent = blueprintBones.find(b => b.parentId === parent.parentId && b.id !== parent.id && b.isMirror !== parent.isMirror);
                     if (mirrorParent) mirrorParentId = mirrorParent.id;
                 }
-
-                const mirrorX = centerX - (finalX - centerX);
-                const mirrorBone = createNewBone(mirrorParentId, mirrorX, targetY, true);
+                const mirrorBone = createNewBone(mirrorParentId, -finalLX, targetLocalY, true);
                 blueprintBones.push(mirrorBone);
             }
 
@@ -537,12 +594,13 @@
 
         function drawSkeleton(targetCtx, bones, startX, startY, baseAngle, timeScale = 0, isEditor = false) {
             const bonePositions = new Map();
-            const centerX = isEditor ? editorCanvas.width / 2 : 0;
+            const time = performance.now() * 0.005 * timeScale;
 
             bones.forEach(bone => {
                 if (bone.type === 'head') {
-                    bone.computedX = isEditor ? centerX : startX;
-                    bone.computedY = isEditor ? 100 : startY;
+                    // 에디터 모드일 때는 줌/팬 시점 적용, 월드 모드일 때는 월드 좌표 사용
+                    bone.computedX = isEditor ? bone.localX * editorView.zoom + editorView.x : startX;
+                    bone.computedY = isEditor ? bone.localY * editorView.zoom + editorView.y : startY;
                     bonePositions.set(bone.id, { x: bone.computedX, y: bone.computedY, angle: isEditor ? -Math.PI/2 : baseAngle });
                     
                     targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : '#00ffcc';
@@ -561,15 +619,14 @@
                 } else {
                     let animationOffset = 0;
                     if (bone.type === 'moving' && timeScale > 0) {
-                        // 기존 time 대신 누적된 walkPhase 사용
                         const amplitude = bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1);
                         animationOffset = Math.sin(animal.walkPhase + bone.phase) * amplitude;
                     }
                     worldAngle = parent.angle + (bone.angle - (-Math.PI / 2)) + animationOffset;
                 }
 
-                const ex = parent.x + Math.cos(worldAngle) * bone.length;
-                const ey = parent.y + Math.sin(worldAngle) * bone.length;
+                const ex = isEditor ? bone.localX * editorView.zoom + editorView.x : parent.x + Math.cos(worldAngle) * bone.length;
+                const ey = isEditor ? bone.localY * editorView.zoom + editorView.y : parent.y + Math.sin(worldAngle) * bone.length;
 
                 bone.computedX = ex;
                 bone.computedY = ey;
@@ -577,7 +634,7 @@
                 targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
                 if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
                 
-                targetCtx.lineWidth = bone.type === 'moving' ? 2 : 1;
+                targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1) * (isEditor ? editorView.zoom : 1);
                 targetCtx.beginPath();
                 targetCtx.moveTo(parent.x, parent.y);
                 targetCtx.lineTo(ex, ey);
@@ -587,10 +644,10 @@
                 if (bone.id === selectedBoneId && isEditor) targetCtx.fillStyle = '#ffcc00';
                 
                 targetCtx.beginPath();
-                targetCtx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+                targetCtx.arc(ex, ey, 2.5 * (isEditor ? editorView.zoom : 1), 0, Math.PI * 2);
                 targetCtx.fill();
 
-                bonePositions.set(bone.id, { x: ex, y: ey, angle: worldAngle });
+                bonePositions.set(bone.id, { x: ex, y: ey, angle: isEditor ? bone.angle : worldAngle });
             });
         }
 
