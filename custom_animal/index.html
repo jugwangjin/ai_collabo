@@ -147,7 +147,31 @@
         }
 
         applyBtn.onclick = () => { animal.bones = JSON.parse(JSON.stringify(blueprintBones)); applyBtn.innerText = '적용 완료!'; setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000); };
-        deleteBtn.onclick = () => { if (blueprintBones.length > 1) { const last = blueprintBones.pop(); if (last.mirrorId !== null) { const idx = blueprintBones.findIndex(b => b.id === last.mirrorId); if (idx !== -1) blueprintBones.splice(idx, 1); } selectedBoneId = 0; updateBoneList(); } };
+        deleteBtn.onclick = () => {
+            if (blueprintBones.length > 1) {
+                const last = blueprintBones.pop();
+                // 대칭 짝이 있다면 함께 삭제
+                if (last.mirrorId !== null) {
+                    const mirrorIdx = blueprintBones.findIndex(b => b.id === last.mirrorId);
+                    if (mirrorIdx !== -1) blueprintBones.splice(mirrorIdx, 1);
+                }
+                // 삭제 후 고아가 된 자식 노드들도 연쇄적으로 삭제
+                const cleanupChildren = (pId) => {
+                    for (let i = blueprintBones.length - 1; i >= 0; i--) {
+                        if (blueprintBones[i].parentId === pId) {
+                            const childId = blueprintBones[i].id;
+                            blueprintBones.splice(i, 1);
+                            cleanupChildren(childId);
+                        }
+                    }
+                };
+                cleanupChildren(last.id);
+                if (last.mirrorId !== null) cleanupChildren(last.mirrorId);
+
+                selectedBoneId = 0; 
+                updateBoneList();
+            }
+        };
         speedSlider.oninput = (e) => { speedMultiplier = parseFloat(e.target.value); speedValEl.innerText = speedMultiplier.toFixed(1); };
         
         document.getElementById('add-move-btn').onclick = () => { selectedType = 'moving'; document.getElementById('add-move-btn').className = 'active'; document.getElementById('add-garment-btn').className = ''; };
@@ -261,13 +285,23 @@
                 
                 let worldAngle;
                 if (isEditor) {
-                    worldAngle = bone.relAngle; // 에디터는 절대 좌표 유지
+                    worldAngle = bone.relAngle; 
                 } else {
                     let animOffset = 0;
-                    if (bone.type === 'moving' && timeScale > 0) animOffset = Math.sin(animal.walkPhase + bone.phase) * (bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1));
-                    // 설계 당시의 머리 각도(-PI/2) 대비 상대적 회전량을 부모 각도에 더함
-                    const relativeOffset = bone.relAngle - (-Math.PI / 2);
-                    worldAngle = parent.angle + relativeOffset + animOffset;
+                    if (bone.type === 'moving' && timeScale > 0) {
+                        const amplitude = bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1);
+                        animOffset = Math.sin(animal.walkPhase + bone.phase) * amplitude;
+                    }
+                    
+                    // 부모의 에디터 당시 절대 각도를 가져옴 (머리는 기본 -PI/2)
+                    const parentBone = blueprintBones.find(b => b.id === bone.parentId);
+                    const parentEditorAngle = (parentBone.type === 'head') ? -Math.PI / 2 : parentBone.relAngle;
+                    
+                    // 설계 당시 부모와 자식 사이의 각도 차이(Delta) 계산
+                    const angleDelta = bone.relAngle - parentEditorAngle;
+                    
+                    // 월드 각도 = 부모의 현재 월드 각도 + 설계상의 차이 + 애니메이션
+                    worldAngle = parent.angle + angleDelta + animOffset;
                 }
 
                 const ex = isEditor ? bone.localX * editorView.zoom + editorView.x : parent.x + Math.cos(worldAngle) * bone.length;
