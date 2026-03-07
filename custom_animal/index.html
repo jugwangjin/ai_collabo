@@ -9,26 +9,39 @@
             --bg: #0a0a0a;
             --accent: #00ffcc;
             --editor-bg: #151515;
-            --panel-width: 320px;
         }
         body { margin: 0; background: var(--bg); color: #fff; font-family: 'Pretendard', sans-serif; overflow: hidden; display: flex; }
         
         /* Layout */
         #editor-panel {
-            width: var(--panel-width);
+            width: 320px; /* 초기 너비 */
+            min-width: 250px;
+            max-width: 600px;
             height: 100vh;
             background: var(--editor-bg);
-            border-right: 1px solid #333;
             display: flex;
             flex-direction: column;
             padding: 20px;
             box-sizing: border-box;
             z-index: 100;
+            overflow-x: hidden;
+        }
+        #resizer {
+            width: 6px;
+            height: 100vh;
+            background: #222;
+            cursor: col-resize;
+            transition: background 0.2s;
+            z-index: 110;
+        }
+        #resizer:hover, #resizer.dragging {
+            background: var(--accent);
         }
         #world {
             flex: 1;
             height: 100vh;
             position: relative;
+            min-width: 0; /* flex container 내부 캔버스 찌그러짐 방지 */
         }
         
         /* UI */
@@ -123,6 +136,8 @@
         </div>
     </div>
 
+    <div id="resizer"></div>
+
     <div id="world">
         <a href="../index.html" class="back-btn">← 나가기</a>
         <canvas id="canvas"></canvas>
@@ -143,13 +158,47 @@
         const speedValEl = document.getElementById('speed-val');
         const applyBtn = document.getElementById('apply-btn');
         const deleteBtn = document.getElementById('delete-btn');
+        const resizer = document.getElementById('resizer');
+        const editorPanel = document.getElementById('editor-panel');
         
         let width, height;
         let mouseX = 0, mouseY = 0;
         let isRightClick = false;
         let isMouseDown = false;
         let rippleTimer = 0;
-        
+        let isResizing = false;
+
+        // Resizer Logic
+        resizer.onmousedown = (e) => {
+            isResizing = true;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        };
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isResizing) {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                return;
+            }
+            
+            let newWidth = e.clientX;
+            if (newWidth >= 250 && newWidth <= 600) {
+                editorPanel.style.width = newWidth + 'px';
+                resize(); // 캔버스 크기 즉시 업데이트
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = 'default';
+            }
+            isMouseDown = false;
+        });
+
         // Editor State
         let selectedType = 'moving';
         let symmetryEnabled = false;
@@ -202,11 +251,14 @@
         }
 
         function resize() {
-            width = window.innerWidth;
+            const panelW = editorPanel.offsetWidth;
+            const resizerW = resizer.offsetWidth;
+            width = window.innerWidth - panelW - resizerW;
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
-            editorCanvas.width = 280;
+            
+            editorCanvas.width = panelW - 40;
             editorCanvas.height = 200;
         }
 
