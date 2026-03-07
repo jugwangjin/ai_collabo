@@ -217,8 +217,9 @@
                     resize();
                 }
             } else {
-                mouseX = e.clientX;
-                mouseY = e.clientY;
+                const rect = canvas.getBoundingClientRect();
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
             }
         });
 
@@ -307,7 +308,11 @@
         canvas.addEventListener('mousedown', e => {
             isMouseDown = true;
             isRightClick = e.button === 2;
-            createRipple(e.clientX, e.clientY, isRightClick ? 5 : 2);
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            createRipple(x, y, isRightClick ? 1.5 : 0.8);
             
             // Play Sounds
             if (isRightClick) {
@@ -320,10 +325,6 @@
         });
         
         window.addEventListener('mouseup', () => isMouseDown = false);
-        window.addEventListener('mousemove', e => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
 
         applyBtn.onclick = () => {
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
