@@ -138,6 +138,7 @@
         let mouseX = 0, mouseY = 0;
         let isRightClick = false;
         let isMouseDown = false;
+        let rippleTimer = 0; // 파문 생성 타이머 추가
         
         // Audio Assets
         const soundLeft = new Audio('left.mp3');
@@ -303,6 +304,12 @@
         function update() {
             // Movement Logic
             if (isMouseDown) {
+                // 드래그 중 주기적 파문 생성 (약 15프레임마다)
+                rippleTimer++;
+                if (rippleTimer % 15 === 0) {
+                    createRipple(mouseX, mouseY, isRightClick ? 3 : 1.5);
+                }
+
                 const dx = mouseX - animal.pos.x;
                 const dy = mouseY - animal.pos.y;
                 const dist = Math.hypot(dx, dy);
