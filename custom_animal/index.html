@@ -220,7 +220,8 @@
         }
 
         function createRipple(x, y, power) {
-            animal.ripples.push({ x, y, r: 0, a: 1, p: power });
+            const color = power > 3 ? '255, 120, 0' : '0, 255, 204';
+            animal.ripples.push({ x, y, r: 0, a: 1, p: power, color: color });
         }
 
         // Main Loop
@@ -254,8 +255,8 @@
 
             // Ripple Update
             animal.ripples.forEach((r, i) => {
-                r.r += r.p * 2;
-                r.a *= 0.96;
+                r.r += r.p * 3;
+                r.a *= 0.94;
                 if (r.a < 0.01) animal.ripples.splice(i, 1);
             });
         }
@@ -264,13 +265,20 @@
             ctx.fillStyle = 'rgba(10, 10, 10, 0.4)';
             ctx.fillRect(0, 0, width, height);
 
-            // Draw Ripples
-            ctx.lineWidth = 1;
+            // Draw Ripples (Enhanced Visual Feedback)
             animal.ripples.forEach(r => {
-                ctx.strokeStyle = `rgba(0, 255, 204, ${r.a})`;
+                // Outer Ring
+                ctx.lineWidth = 2 + r.a * 3;
+                ctx.strokeStyle = `rgba(${r.color}, ${r.a})`;
                 ctx.beginPath();
                 ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
                 ctx.stroke();
+
+                // Core Burst (Center visualization for recording)
+                ctx.fillStyle = `rgba(${r.color}, ${r.a * 0.7})`;
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, 5 * r.a, 0, Math.PI * 2);
+                ctx.fill();
             });
 
             // Calculate & Draw Skeleton
