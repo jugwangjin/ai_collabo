@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Animal: Progressive Motion Lab</title>
+    <title>커스텀 애니멀: 유전학 실험실</title>
     <style>
         :root {
             --bg: #0a0a0a;
@@ -14,7 +14,7 @@
         
         /* Layout */
         #editor-panel {
-            width: 320px; /* 초기 너비 */
+            width: 320px;
             min-width: 250px;
             max-width: 600px;
             height: 100vh;
@@ -24,7 +24,7 @@
             padding: 20px;
             box-sizing: border-box;
             z-index: 100;
-            overflow-y: auto; /* 세로 스크롤 허용 */
+            overflow-y: auto;
             overflow-x: hidden;
         }
         #resizer {
@@ -36,9 +36,8 @@
             z-index: 110;
             flex-shrink: 0;
         }
-        #resizer:hover, #resizer.dragging {
-            background: var(--accent);
-        }
+        #resizer:hover, #resizer.dragging { background: var(--accent); }
+        
         #world {
             flex: 1;
             height: 100vh;
@@ -46,13 +45,14 @@
             min-width: 0;
         }
         
-        /* UI */
+        /* UI Components */
         h1 { font-size: 14px; font-weight: 200; letter-spacing: 3px; margin-bottom: 30px; color: var(--accent); flex-shrink: 0; }
         .controls { display: flex; flex-direction: column; gap: 15px; flex-shrink: 0; }
         .control-group { background: #222; padding: 15px; border-radius: 10px; font-size: 11px; }
+        
         #editor-canvas-container {
             width: 100%;
-            height: 400px; /* 초기 높이 더 상향 */
+            height: 400px;
             min-height: 200px;
             background: #000;
             border: 1px dashed #444;
@@ -72,41 +72,28 @@
             border-radius: 0 0 10px 10px;
             transition: background 0.2s;
         }
-        #editor-v-resizer:hover, #editor-v-resizer.dragging {
-            background: var(--accent);
-        }
+        #editor-v-resizer:hover, #editor-v-resizer.dragging { background: var(--accent); }
+        
         #apply-btn {
-            width: 100%;
-            padding: 12px;
-            background: var(--accent);
-            color: #000;
-            font-weight: bold;
-            border: none;
-            margin-top: 10px;
-            letter-spacing: 2px;
+            width: 100%; padding: 12px; background: var(--accent); color: #000; font-weight: bold; border: none; margin-top: 10px; letter-spacing: 2px; cursor: pointer;
         }
-        #apply-btn:hover {
-            filter: brightness(1.2);
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
-        }
+        #apply-btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(0, 255, 204, 0.4); }
+        
         .label { opacity: 0.5; margin-bottom: 8px; display: block; }
         button { 
-            background: #333; border: 1px solid #444; color: #eee; padding: 8px; cursor: pointer; border-radius: 5px; font-family: inherit; font-size: 11px;
-            transition: all 0.2s;
+            background: #333; border: 1px solid #444; color: #eee; padding: 8px; cursor: pointer; border-radius: 5px; font-family: inherit; font-size: 11px; transition: all 0.2s;
         }
         button:hover { background: var(--accent); color: #000; border-color: var(--accent); }
         button.active { background: var(--accent); color: #000; }
         
         .bone-list { margin-top: 20px; flex: 1; overflow-y: auto; font-size: 10px; opacity: 0.7; }
-        .bone-item { padding: 5px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .bone-item { padding: 5px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .bone-item.selected { background: rgba(0, 255, 204, 0.2); border-left: 2px solid var(--accent); }
         
         canvas { display: block; width: 100%; height: 100%; }
         
-        .editor-help { font-size: 9px; color: #888; margin-top: 10px; line-height: 1.4; }
-        .instructions {
-            position: absolute; bottom: 30px; right: 30px; font-size: 11px; opacity: 0.3; text-align: right; pointer-events: none;
-        }
+        .editor-help { font-size: 9px; color: #888; margin-top: 10px; line-height: 1.4; margin-bottom: 10px; }
+        .instructions { position: absolute; bottom: 30px; right: 30px; font-size: 11px; opacity: 0.3; text-align: right; pointer-events: none; }
         .back-btn { position: absolute; top: 20px; right: 20px; color: #fff; text-decoration: none; font-size: 11px; opacity: 0.3; z-index: 100; }
     </style>
 </head>
@@ -122,10 +109,12 @@
 
         <div class="controls">
             <button id="apply-btn">월드에 적용하기</button>
+            <button id="view-reset-btn" style="width: 100%; margin-top: 5px; font-size: 9px; opacity: 0.6;">시점 초기화 (줌/팬)</button>
             
             <div class="editor-help">
                 • 관절(점) 클릭: 연결할 부모 선택<br>
-                • 빈 공간 클릭: 선택된 곳에 새 뼈대 추가
+                • 빈 공간 클릭: 새 뼈대 추가<br>
+                • 마우스 휠: 확대/축소 | 우클릭 드래그: 이동
             </div>
 
             <div class="control-group">
@@ -150,7 +139,6 @@
 
         <div class="bone-list" id="bone-list">
             <div class="label">골격 데이터:</div>
-            <!-- Bones will be listed here -->
         </div>
     </div>
 
@@ -160,9 +148,9 @@
         <a href="../index.html" class="back-btn">← 나가기</a>
         <canvas id="canvas"></canvas>
         <div class="instructions">
-            왼쪽 클릭: 잔잔한 걸음 (유도)<br>
-            오른쪽 클릭: 빠른 질주 (유도)<br>
-            에디터 캔버스를 클릭하여 뼈대를 설계하세요.
+            왼쪽 드래그: 유도 (잔잔한 파문)<br>
+            오른쪽 드래그: 질주 (강한 파문)<br>
+            에디터 캔버스에서 생명체를 설계하세요.
         </div>
     </div>
 
@@ -176,6 +164,7 @@
         const speedValEl = document.getElementById('speed-val');
         const applyBtn = document.getElementById('apply-btn');
         const deleteBtn = document.getElementById('delete-btn');
+        const viewResetBtn = document.getElementById('view-reset-btn');
         const resizer = document.getElementById('resizer');
         const editorVResizer = document.getElementById('editor-v-resizer');
         const editorPanel = document.getElementById('editor-panel');
@@ -189,95 +178,24 @@
         let isResizingH = false;
         let isResizingV = false;
 
-        // Editor View State (줌/팬)
+        // Editor View (Zoom/Pan)
         const editorView = {
-            x: 140, // 초기 중심 X
-            y: 150, // 초기 중심 Y
-            zoom: 1.0,
-            isDragging: false,
-            lastX: 0,
-            lastY: 0
+            x: 140, y: 150, zoom: 1.0,
+            isDragging: false, lastX: 0, lastY: 0
         };
 
-        // Resizer Logic (Horizontal)
-        resizer.onmousedown = (e) => {
-            isResizingH = true;
-            resizer.classList.add('dragging');
-            document.body.style.cursor = 'col-resize';
-            e.preventDefault();
-        };
-
-        // Editor Vertical Resizer Logic
-        editorVResizer.onmousedown = (e) => {
-            isResizingV = true;
-            editorVResizer.classList.add('dragging');
-            document.body.style.cursor = 'row-resize';
-            e.preventDefault();
-        };
-
-        // Editor View Control
-        editorCanvas.onwheel = (e) => {
-            e.preventDefault();
-            const factor = Math.pow(1.1, -e.deltaY / 100);
-            const rect = editorCanvas.getBoundingClientRect();
-            
-            // 캔버스 내부 상대 좌표 (0~1 범위로 정규화하여 리사이징 영향 최소화)
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
-
-            const prevZoom = editorView.zoom;
-            editorView.zoom = Math.max(0.2, Math.min(5, editorView.zoom * factor));
-            const actualFactor = editorView.zoom / prevZoom;
-            
-            // 마우스 위치(mx, my)를 기준으로 줌 원점 유지
-            editorView.x = mx - (mx - editorView.x) * actualFactor;
-            editorView.y = my - (my - editorView.y) * actualFactor;
-        };
-
-        editorCanvas.onmousedown = (e) => {
-            const rect = editorCanvas.getBoundingClientRect();
-            const ex = e.clientX - rect.left;
-            const ey = e.clientY - rect.top;
-
-            if (e.button === 2 || e.button === 1 || e.altKey) {
-                editorView.isDragging = true;
-                editorView.lastX = e.clientX;
-                editorView.lastY = e.clientY;
-                e.preventDefault();
-                return;
-            }
-            
-            // 이미 있는 관절 선택 시도 (화면 좌표 기반 판정)
-            const clickedBone = blueprintBones.find(b => {
-                const screenX = b.localX * editorView.zoom + editorView.x;
-                const screenY = b.localY * editorView.zoom + editorView.y;
-                return Math.hypot(ex - screenX, ey - screenY) < 15;
-            });
-
-            if (clickedBone) {
-                selectedBoneId = clickedBone.id;
-                updateBoneList();
-                return;
-            }
-
-            // 새 뼈대 추가 (함수 내부에서 좌표 보정 한 번 더 수행)
-            addBoneAt(e.clientX, e.clientY);
-        };
+        // Resizer Logic
+        resizer.onmousedown = (e) => { isResizingH = true; resizer.classList.add('dragging'); document.body.style.cursor = 'col-resize'; e.preventDefault(); };
+        editorVResizer.onmousedown = (e) => { isResizingV = true; editorVResizer.classList.add('dragging'); document.body.style.cursor = 'row-resize'; e.preventDefault(); };
 
         window.addEventListener('mousemove', (e) => {
             if (isResizingH) {
                 let newWidth = e.clientX;
-                if (newWidth >= 250 && newWidth <= 600) {
-                    editorPanel.style.width = newWidth + 'px';
-                    resize();
-                }
+                if (newWidth >= 250 && newWidth <= 600) { editorPanel.style.width = newWidth + 'px'; resize(); }
             } else if (isResizingV) {
                 const rect = editorCanvasContainer.getBoundingClientRect();
                 let newHeight = e.clientY - rect.top;
-                if (newHeight >= 200) {
-                    editorCanvasContainer.style.height = newHeight + 'px';
-                    resize();
-                }
+                if (newHeight >= 200) { editorCanvasContainer.style.height = newHeight + 'px'; resize(); }
             } else if (editorView.isDragging) {
                 editorView.x += e.clientX - editorView.lastX;
                 editorView.y += e.clientY - editorView.lastY;
@@ -291,219 +209,118 @@
         });
 
         window.addEventListener('mouseup', () => {
-            if (isResizingH) {
-                isResizingH = false;
-                resizer.classList.remove('dragging');
-            }
-            if (isResizingV) {
-                isResizingV = false;
-                editorVResizer.classList.remove('dragging');
-            }
-            editorView.isDragging = false;
-            document.body.style.cursor = 'default';
-            isMouseDown = false;
+            isResizingH = false; isResizingV = false; editorView.isDragging = false;
+            resizer.classList.remove('dragging'); editorVResizer.classList.remove('dragging');
+            document.body.style.cursor = 'default'; isMouseDown = false;
         });
 
-        // Editor State
+        // Editor Controls
+        editorCanvas.oncontextmenu = (e) => e.preventDefault();
+        editorCanvas.onwheel = (e) => {
+            e.preventDefault();
+            const factor = Math.pow(1.1, -e.deltaY / 100);
+            const rect = editorCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const prevZoom = editorView.zoom;
+            editorView.zoom = Math.max(0.2, Math.min(5, editorView.zoom * factor));
+            const actualFactor = editorView.zoom / prevZoom;
+            editorView.x = mx - (mx - editorView.x) * actualFactor;
+            editorView.y = my - (my - editorView.y) * actualFactor;
+        };
+
+        editorCanvas.onmousedown = (e) => {
+            if (e.button === 2 || e.button === 1 || e.altKey) {
+                editorView.isDragging = true; editorView.lastX = e.clientX; editorView.lastY = e.clientY;
+                return;
+            }
+            const rect = editorCanvas.getBoundingClientRect();
+            const ex = (e.clientX - rect.left) * (editorCanvas.width / rect.width);
+            const ey = (e.clientY - rect.top) * (editorCanvas.height / rect.height);
+
+            const clickedBone = blueprintBones.find(b => {
+                const sx = b.localX * editorView.zoom + editorView.x;
+                const sy = b.localY * editorView.zoom + editorView.y;
+                return Math.hypot(ex - sx, ey - sy) < 15;
+            });
+
+            if (clickedBone) { selectedBoneId = clickedBone.id; updateBoneList(); return; }
+            addBoneAt(e.clientX, e.clientY);
+        };
+
+        viewResetBtn.onclick = () => { editorView.x = editorCanvas.width / 2; editorView.y = 150; editorView.zoom = 1.0; };
+
+        // Audio & State
+        const soundLeft = new Audio('left.mp3');
+        const soundRight = new Audio('right.mp3');
         let selectedType = 'moving';
         let symmetryEnabled = false;
         let speedMultiplier = 1.0;
-        let selectedBoneId = 0; 
-        let blueprintBones = [
-            { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }
-        ];
+        let selectedBoneId = 0;
+        let blueprintBones = [{ id: 0, parentId: null, length: 0, angle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }];
         
-        // Speed Slider Event
-        speedSlider.oninput = (e) => {
-            speedMultiplier = parseFloat(e.target.value);
-            speedValEl.innerText = speedMultiplier.toFixed(1);
-        };
+        const animal = { pos: { x: 0, y: 0 }, angle: 0, targetAngle: 0, speed: 0, walkPhase: 0, bones: [], ripples: [], bgParticles: [] };
 
-        // Animal State
-        const animal = {
-            pos: { x: 0, y: 0 },
-            vel: { x: 0, y: 0 },
-            angle: 0,
-            targetAngle: 0,
-            speed: 0,
-            walkPhase: 0, 
-            bones: [],
-            ripples: [],
-            bgParticles: []
-        };
-
-        // Initialize Head
         function initAnimal() {
             animal.pos = { x: (window.innerWidth - 320) / 2 + 320, y: window.innerHeight / 2 };
-            blueprintBones = [
-                { id: 0, parentId: null, length: 0, angle: 0, currentAngle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }
-            ];
+            blueprintBones = [{ id: 0, parentId: null, length: 0, angle: 0, type: 'head', phase: 0, localX: 0, localY: 0 }];
             selectedBoneId = 0;
-            editorView.x = 140; editorView.y = 150; editorView.zoom = 1.0;
             animal.bones = JSON.parse(JSON.stringify(blueprintBones));
-            updateBoneList();
-            
-            // 초기 입자 생성
             animal.bgParticles = [];
-            for(let i=0; i<80; i++) {
-                animal.bgParticles.push({
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
-                    vx: (Math.random() - 0.5) * 0.4,
-                    vy: (Math.random() - 0.5) * 0.4,
-                    size: Math.random() * 3 + 1,
-                    alpha: Math.random() * 0.15 + 0.05
-                });
-            }
+            for(let i=0; i<80; i++) animal.bgParticles.push({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4, size: Math.random()*3+1, alpha: Math.random()*0.15+0.05 });
+            updateBoneList();
         }
 
         function resize() {
             const panelW = editorPanel.offsetWidth;
-            const resizerW = resizer.offsetWidth;
-            width = window.innerWidth - panelW - resizerW;
+            width = window.innerWidth - panelW - resizer.offsetWidth;
             height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
-            
+            canvas.width = width; canvas.height = height;
             editorCanvas.width = panelW - 40;
-            editorCanvas.height = 200;
+            editorCanvas.height = editorCanvasContainer.offsetHeight;
         }
 
-        window.addEventListener('resize', resize);
-        resize();
-
-        // Interaction
-        window.addEventListener('contextmenu', e => e.preventDefault());
+        applyBtn.onclick = () => { animal.bones = JSON.parse(JSON.stringify(blueprintBones)); applyBtn.innerText = '적용 완료!'; setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000); };
+        deleteBtn.onclick = () => { if (blueprintBones.length > 1) { const last = blueprintBones.pop(); if (last.id % 2 !== 0 && blueprintBones[blueprintBones.length-1].id === last.id - 1) blueprintBones.pop(); selectedBoneId = blueprintBones[blueprintBones.length-1].id; updateBoneList(); } };
+        speedSlider.oninput = (e) => { speedMultiplier = parseFloat(e.target.value); speedValEl.innerText = speedMultiplier.toFixed(1); };
         
-        canvas.addEventListener('mousedown', e => {
-            isMouseDown = true;
-            isRightClick = e.button === 2;
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            createRipple(x, y, isRightClick ? 1.5 : 0.8);
-            
-            // Play Sounds
-            if (isRightClick) {
-                soundRight.currentTime = 0;
-                soundRight.play();
-            } else {
-                soundLeft.currentTime = 0;
-                soundLeft.play();
-            }
-        });
-        
-        window.addEventListener('mouseup', () => isMouseDown = false);
-
-        applyBtn.onclick = () => {
-            animal.bones = JSON.parse(JSON.stringify(blueprintBones));
-            applyBtn.innerText = '적용 완료!';
-            setTimeout(() => applyBtn.innerText = '월드에 적용하기', 1000);
-        };
-
-        deleteBtn.onclick = () => {
-            if (blueprintBones.length > 1) {
-                const last = blueprintBones.pop();
-                if (last.id % 2 !== 0 && blueprintBones[blueprintBones.length-1].id === last.id - 1) {
-                    blueprintBones.pop();
-                }
-                selectedBoneId = blueprintBones[blueprintBones.length-1].id;
-                updateBoneList();
-            }
-        };
-
-        // Editor Logic
-        document.getElementById('add-move-btn').onclick = () => {
-            selectedType = 'moving';
-            document.getElementById('add-move-btn').className = 'active';
-            document.getElementById('add-garment-btn').className = '';
-        };
-        document.getElementById('add-garment-btn').onclick = () => {
-            selectedType = 'garment';
-            document.getElementById('add-garment-btn').className = 'active';
-            document.getElementById('add-move-btn').className = '';
-        };
-        document.getElementById('symmetry-btn').onclick = () => {
-            symmetryEnabled = !symmetryEnabled;
-            document.getElementById('symmetry-btn').innerText = `대칭 모드: ${symmetryEnabled ? '켬' : '끔'}`;
-            document.getElementById('symmetry-btn').style.color = symmetryEnabled ? '#00ffcc' : '#fff';
-        };
+        document.getElementById('add-move-btn').onclick = () => { selectedType = 'moving'; document.getElementById('add-move-btn').className = 'active'; document.getElementById('add-garment-btn').className = ''; };
+        document.getElementById('add-garment-btn').onclick = () => { selectedType = 'garment'; document.getElementById('add-garment-btn').className = 'active'; document.getElementById('add-move-btn').className = ''; };
+        document.getElementById('symmetry-btn').onclick = () => { symmetryEnabled = !symmetryEnabled; document.getElementById('symmetry-btn').innerText = `대칭 모드: ${symmetryEnabled ? '켬' : '끔'}`; document.getElementById('symmetry-btn').style.color = symmetryEnabled ? '#00ffcc' : '#fff'; };
         document.getElementById('reset-btn').onclick = () => initAnimal();
-
-        editorCanvas.onclick = (e) => {
-            const rect = editorCanvas.getBoundingClientRect();
-            const ex = e.clientX - rect.left;
-            const ey = e.clientY - rect.top;
-
-            const clickedBone = blueprintBones.find(b => {
-                return Math.hypot(ex - b.computedX, ey - b.computedY) < 15;
-            });
-
-            if (clickedBone) {
-                selectedBoneId = clickedBone.id;
-                updateBoneList();
-                return;
-            }
-
-            addBoneAt(ex, ey);
-        };
 
         function addBoneAt(clientX, clientY) {
             const parent = blueprintBones.find(b => b.id === selectedBoneId);
             if (!parent) return;
-
-            // 스크린 좌표 -> 에디터 캔버스 상대 좌표 -> 로컬 설계 좌표 (줌/팬 역산)
             const rect = editorCanvas.getBoundingClientRect();
-            const ex = clientX - rect.left;
-            const ey = clientY - rect.top;
-
-            const targetLocalX = (ex - editorView.x) / editorView.zoom;
-            const targetLocalY = (ey - editorView.y) / editorView.zoom;
-
-            const dx = targetLocalX - parent.localX;
-            const dy = targetLocalY - parent.localY;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 5) return;
+            const ex = (clientX - rect.left) * (editorCanvas.width / rect.width);
+            const ey = (clientY - rect.top) * (editorCanvas.height / rect.height);
+            const lx = (ex - editorView.x) / editorView.zoom;
+            const ly = (ey - editorView.y) / editorView.zoom;
+            
+            const dx = lx - parent.localX; const dy = ly - parent.localY;
+            if (Math.hypot(dx, dy) < 5) return;
 
             const id = Date.now();
-            
-            const createNewBone = (pId, lx, ly, isMirror = false) => {
+            const createBone = (pId, x, y, isMirror = false) => {
                 const p = blueprintBones.find(b => b.id === pId);
-                const relDx = lx - p.localX;
-                const relDy = ly - p.localY;
-                const relAngle = Math.atan2(relDy, relDx);
-
-                return {
-                    id: isMirror ? id + 1 : id,
-                    parentId: pId,
-                    length: Math.hypot(relDx, relDy),
-                    angle: relAngle, 
-                    type: selectedType,
-                    phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0),
-                    isMirror: isMirror,
-                    isOnAxis: Math.abs(lx) < 5 && !isMirror,
-                    localX: lx,
-                    localY: ly
-                };
+                const relAngle = Math.atan2(y - p.localY, x - p.localX);
+                return { id: isMirror ? id + 1 : id, parentId: pId, length: Math.hypot(x - p.localX, y - p.localY), angle: relAngle, type: selectedType, phase: Math.random() * Math.PI * 2 + (isMirror ? Math.PI : 0), isMirror, isOnAxis: Math.abs(x) < 5 && !isMirror, localX: x, localY: y };
             };
 
-            const finalLX = Math.abs(targetLocalX) < 5 ? 0 : targetLocalX; // 중앙 흡착 (로컬 0 기준)
-            const newBone = createNewBone(parent.id, finalLX, targetLocalY);
+            const finalLX = Math.abs(lx) < 5 ? 0 : lx;
+            const newBone = createBone(parent.id, finalLX, ly);
             blueprintBones.push(newBone);
 
             if (symmetryEnabled && Math.abs(finalLX) >= 5) {
-                let mirrorParentId = parent.id;
+                let mPId = parent.id;
                 if (parent.parentId !== null && !parent.isOnAxis) {
-                    const mirrorParent = blueprintBones.find(b => b.parentId === parent.parentId && b.id !== parent.id && b.isMirror !== parent.isMirror);
-                    if (mirrorParent) mirrorParentId = mirrorParent.id;
+                    const mP = blueprintBones.find(b => b.parentId === parent.parentId && b.id !== parent.id && b.isMirror !== parent.isMirror);
+                    if (mP) mPId = mP.id;
                 }
-                const mirrorBone = createNewBone(mirrorParentId, -finalLX, targetLocalY, true);
-                blueprintBones.push(mirrorBone);
+                blueprintBones.push(createBone(mPId, -finalLX, ly, true));
             }
-
-            selectedBoneId = newBone.id;
-            updateBoneList();
+            selectedBoneId = newBone.id; updateBoneList();
         }
 
         function updateBoneList() {
@@ -519,215 +336,80 @@
         }
 
         function createRipple(x, y, power) {
-            const color = power > 3 ? '255, 120, 0' : '0, 255, 204';
-            animal.ripples.push({ x, y, r: 0, a: 1, p: power, color: color });
+            const color = power > 1.0 ? '255, 120, 0' : '0, 255, 204';
+            animal.ripples.push({ x, y, r: 0, a: 1, p: power, color });
         }
 
-        // Main Loop
         function update() {
-            // Movement Logic
             if (isMouseDown) {
-                // 드래그 중 주기적 파문 생성 빈도 하향 (15 -> 45프레임)
                 rippleTimer++;
-                if (rippleTimer % 45 === 0) {
-                    createRipple(mouseX, mouseY, isRightClick ? 1.5 : 0.8);
-                }
-
-                const dx = mouseX - animal.pos.x;
-                const dy = mouseY - animal.pos.y;
-                const dist = Math.hypot(dx, dy);
-                
+                if (rippleTimer % 45 === 0) createRipple(mouseX, mouseY, isRightClick ? 1.5 : 0.8);
+                const dx = mouseX - animal.pos.x, dy = mouseY - animal.pos.y;
                 animal.targetAngle = Math.atan2(dy, dx);
                 const speedTarget = (isRightClick ? 5 : 2) * speedMultiplier;
                 animal.speed += (speedTarget - animal.speed) * 0.05;
-                
-                // Slowly rotate head
                 let diff = animal.targetAngle - animal.angle;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2; while (diff > Math.PI) diff -= Math.PI * 2;
                 animal.angle += diff * 0.05;
+                if (Math.hypot(dx, dy) > 10) { animal.pos.x += Math.cos(animal.angle) * animal.speed; animal.pos.y += Math.sin(animal.angle) * animal.speed; }
+            } else { animal.speed *= 0.95; animal.pos.x += Math.cos(animal.angle) * animal.speed; animal.pos.y += Math.sin(animal.angle) * animal.speed; }
 
-                if (dist > 10) {
-                    animal.pos.x += Math.cos(animal.angle) * animal.speed;
-                    animal.pos.y += Math.sin(animal.angle) * animal.speed;
-                }
-            } else {
-                animal.speed *= 0.95;
-                // Idle movement
-                animal.pos.x += Math.cos(animal.angle) * animal.speed;
-                animal.pos.y += Math.sin(animal.angle) * animal.speed;
-            }
-
-            // Ripple Update
-            animal.ripples.forEach((r, i) => {
-                r.r += r.p * 1.2; // 확산 속도 대폭 하향 (3 -> 1.2)
-                r.a *= 0.96; // 조금 더 천천히 소멸 (0.94 -> 0.96)
-                if (r.a < 0.01) animal.ripples.splice(i, 1);
-            });
-
-            // BG Particle Update
+            animal.ripples.forEach((r, i) => { r.r += r.p * 0.8; r.a *= 0.95; if (r.a < 0.01) animal.ripples.splice(i, 1); });
             animal.bgParticles.forEach(p => {
-                if (isMouseDown) {
-                    const dx = p.x - mouseX;
-                    const dy = p.y - mouseY;
-                    const dist = Math.hypot(dx, dy);
-                    const forceRadius = isRightClick ? 300 : 200;
-                    
-                    if (dist < forceRadius) {
-                        const force = (1 - dist / forceRadius) * (isRightClick ? 1.5 : 0.4);
-                        p.vx += (dx / dist) * force;
-                        p.vy += (dy / dist) * force;
-                    }
-                }
-
-                p.x += p.vx;
-                p.y += p.vy;
-                
-                // 서서히 원래 속도로 감쇄 (마찰력)
-                p.vx *= 0.97;
-                p.vy *= 0.97;
-
-                // 최소한의 유영 속도 유지
-                p.vx += (Math.random() - 0.5) * 0.02;
-                p.vy += (Math.random() - 0.5) * 0.02;
-
-                if (p.x < 0) p.x = width;
-                if (p.x > width) p.x = 0;
-                if (p.y < 0) p.y = height;
-                if (p.y > height) p.y = 0;
+                if (isMouseDown) { const dx = p.x - mouseX, dy = p.y - mouseY, dist = Math.hypot(dx, dy), forceRad = isRightClick ? 200 : 120; if (dist < forceRad) { const force = (1 - dist / forceRad) * (isRightClick ? 1.0 : 0.3); p.vx += (dx / dist) * force; p.vy += (dy / dist) * force; } }
+                p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy *= 0.97; p.vx += (Math.random()-0.5)*0.02; p.vy += (Math.random()-0.5)*0.02;
+                if (p.x < 0) p.x = width; if (p.x > width) p.x = 0; if (p.y < 0) p.y = height; if (p.y > height) p.y = 0;
             });
-
-            // 누적 위상 업데이트 (시간 독립적이고 부드러운 움직임 보장)
-            // 기본 속도 + 동물의 현재 이동 속도에 비례해 증가
-            const phaseStep = (0.05 + animal.speed * 0.1) * speedMultiplier;
-            animal.walkPhase += phaseStep;
+            animal.walkPhase += (0.05 + animal.speed * 0.1) * speedMultiplier;
         }
 
         function drawSkeleton(targetCtx, bones, startX, startY, baseAngle, timeScale = 0, isEditor = false) {
             const bonePositions = new Map();
-            const time = performance.now() * 0.005 * timeScale;
-
             bones.forEach(bone => {
                 if (bone.type === 'head') {
-                    // 에디터 모드일 때는 줌/팬 시점 적용, 월드 모드일 때는 월드 좌표 사용
-                    bone.computedX = isEditor ? bone.localX * editorView.zoom + editorView.x : startX;
-                    bone.computedY = isEditor ? bone.localY * editorView.zoom + editorView.y : startY;
-                    bonePositions.set(bone.id, { x: bone.computedX, y: bone.computedY, angle: isEditor ? -Math.PI/2 : baseAngle });
-                    
+                    const sx = isEditor ? bone.localX * editorView.zoom + editorView.x : startX;
+                    const sy = isEditor ? bone.localY * editorView.zoom + editorView.y : startY;
+                    bonePositions.set(bone.id, { x: sx, y: sy, angle: isEditor ? -Math.PI/2 : baseAngle });
                     targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : '#00ffcc';
-                    targetCtx.beginPath();
-                    targetCtx.arc(bone.computedX, bone.computedY, 5, 0, Math.PI * 2);
-                    targetCtx.fill();
+                    targetCtx.beginPath(); targetCtx.arc(sx, sy, 5, 0, Math.PI*2); targetCtx.fill();
                     return;
                 }
-
-                const parent = bonePositions.get(bone.parentId);
-                if (!parent) return;
-
+                const parent = bonePositions.get(bone.parentId); if (!parent) return;
                 let worldAngle;
-                if (isEditor) {
-                    worldAngle = bone.angle;
-                } else {
-                    let animationOffset = 0;
-                    if (bone.type === 'moving' && timeScale > 0) {
-                        const amplitude = bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1);
-                        animationOffset = Math.sin(animal.walkPhase + bone.phase) * amplitude;
-                    }
-                    worldAngle = parent.angle + (bone.angle - (-Math.PI / 2)) + animationOffset;
+                if (isEditor) worldAngle = bone.angle;
+                else {
+                    let animOffset = 0;
+                    if (bone.type === 'moving' && timeScale > 0) animOffset = Math.sin(animal.walkPhase + bone.phase) * (bone.isOnAxis ? 0.05 : (0.2 + animal.speed * 0.1));
+                    worldAngle = parent.angle + (bone.angle - (-Math.PI/2)) + animOffset;
                 }
-
                 const ex = isEditor ? bone.localX * editorView.zoom + editorView.x : parent.x + Math.cos(worldAngle) * bone.length;
                 const ey = isEditor ? bone.localY * editorView.zoom + editorView.y : parent.y + Math.sin(worldAngle) * bone.length;
-
-                bone.computedX = ex;
-                bone.computedY = ey;
-
                 targetCtx.strokeStyle = bone.type === 'moving' ? 'rgba(0, 255, 204, 0.8)' : 'rgba(255, 255, 255, 0.3)';
                 if (bone.id === selectedBoneId && isEditor) targetCtx.strokeStyle = '#ffcc00';
-                
                 targetCtx.lineWidth = (bone.type === 'moving' ? 2 : 1) * (isEditor ? editorView.zoom : 1);
-                targetCtx.beginPath();
-                targetCtx.moveTo(parent.x, parent.y);
-                targetCtx.lineTo(ex, ey);
-                targetCtx.stroke();
-
-                targetCtx.fillStyle = bone.type === 'moving' ? '#00ffcc' : '#555';
-                if (bone.id === selectedBoneId && isEditor) targetCtx.fillStyle = '#ffcc00';
-                
-                targetCtx.beginPath();
-                targetCtx.arc(ex, ey, 2.5 * (isEditor ? editorView.zoom : 1), 0, Math.PI * 2);
-                targetCtx.fill();
-
+                targetCtx.beginPath(); targetCtx.moveTo(parent.x, parent.y); targetCtx.lineTo(ex, ey); targetCtx.stroke();
+                targetCtx.fillStyle = bone.id === selectedBoneId && isEditor ? '#ffcc00' : (bone.type === 'moving' ? '#00ffcc' : '#555');
+                targetCtx.beginPath(); targetCtx.arc(ex, ey, 2.5 * (isEditor ? editorView.zoom : 1), 0, Math.PI*2); targetCtx.fill();
                 bonePositions.set(bone.id, { x: ex, y: ey, angle: isEditor ? bone.angle : worldAngle });
             });
         }
 
         function draw() {
-            ctx.fillStyle = 'rgba(10, 10, 10, 0.4)';
-            ctx.fillRect(0, 0, width, height);
-
-            // Draw Background Particles
-            animal.bgParticles.forEach(p => {
-                ctx.fillStyle = `rgba(200, 200, 200, ${p.alpha})`;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Draw World Ripples
-            animal.ripples.forEach(r => {
-                ctx.lineWidth = 2 + r.a * 3;
-                ctx.strokeStyle = `rgba(${r.color}, ${r.a})`;
-                ctx.beginPath();
-                ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.fillStyle = `rgba(${r.color}, ${r.a * 0.7})`;
-                ctx.beginPath();
-                ctx.arc(r.x, r.y, 5 * r.a, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Draw World Animal
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.4)'; ctx.fillRect(0, 0, width, height);
+            animal.bgParticles.forEach(p => { ctx.fillStyle = `rgba(200, 200, 200, ${p.alpha})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); });
+            animal.ripples.forEach(r => { ctx.lineWidth = 2 + r.a*3; ctx.strokeStyle = `rgba(${r.color}, ${r.a})`; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = `rgba(${r.color}, ${r.a*0.7})`; ctx.beginPath(); ctx.arc(r.x, r.y, 5*r.a, 0, Math.PI*2); ctx.fill(); });
             drawSkeleton(ctx, animal.bones, animal.pos.x, animal.pos.y, animal.angle, speedMultiplier, false);
-
-            // Draw Editor Blueprint
-            editorCtx.fillStyle = '#000';
-            editorCtx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
-            
-            // Center axis indicator (Symmetry line)
-            const centerX = editorCanvas.width / 2;
-            editorCtx.strokeStyle = symmetryEnabled ? 'rgba(0, 255, 204, 0.2)' : '#222';
-            editorCtx.setLineDash([5, 5]);
-            editorCtx.beginPath();
-            editorCtx.moveTo(centerX, 0); editorCtx.lineTo(centerX, editorCanvas.height);
-            editorCtx.stroke();
-            editorCtx.setLineDash([]);
-
-            drawSkeleton(editorCtx, blueprintBones, centerX, 100, -Math.PI / 2, 0, true); 
+            editorCtx.fillStyle = '#000'; editorCtx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
+            editorCtx.strokeStyle = symmetryEnabled ? 'rgba(0, 255, 204, 0.15)' : '#111'; editorCtx.setLineDash([5, 5]); editorCtx.beginPath(); editorCtx.moveTo(editorView.x, 0); editorCtx.lineTo(editorView.x, editorCanvas.height); editorCtx.moveTo(0, editorView.y); editorCtx.lineTo(editorCanvas.width, editorView.y); editorCtx.stroke(); editorCtx.setLineDash([]);
+            drawSkeleton(editorCtx, blueprintBones, 0, 0, 0, 0, true);
         }
 
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
+        window.addEventListener('resize', resize);
+        window.addEventListener('contextmenu', e => { if (e.target === editorCanvas) e.preventDefault(); });
+        canvas.addEventListener('mousedown', e => { isMouseDown = true; isRightClick = e.button === 2; const rect = canvas.getBoundingClientRect(); createRipple(e.clientX - rect.left, e.clientY - rect.top, isRightClick ? 1.5 : 0.8); if (isRightClick) { soundRight.currentTime = 0; soundRight.play(); } else { soundLeft.currentTime = 0; soundLeft.play(); } });
 
-        initAnimal();
-        loop();
-        
-        // Initial build
-        setTimeout(() => {
-            selectedType = 'moving';
-            symmetryEnabled = true;
-            addBone();
-            addBone();
-            selectedType = 'garment';
-            symmetryEnabled = false;
-            addBone();
-            // 자동 적용
-            animal.bones = JSON.parse(JSON.stringify(blueprintBones));
-        }, 100);
-
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
+        initAnimal(); resize(); loop();
     </script>
 </body>
 </html>
