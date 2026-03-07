@@ -71,7 +71,11 @@
             <div class="control-group">
                 <span class="label">OPTIONS</span>
                 <button id="symmetry-btn">SYMMETRY MODE: OFF</button>
-                <button id="reset-btn" style="margin-top: 5px; width: 100%; color: #ff5555;">RESET ALL</button>
+                <div style="margin-top: 15px;">
+                    <span class="label">SPEED MULTIPLIER: <span id="speed-val">1.0</span>x</span>
+                    <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1" style="width: 100%; accent-color: var(--accent);">
+                </div>
+                <button id="reset-btn" style="margin-top: 15px; width: 100%; color: #ff5555;">RESET ALL</button>
             </div>
         </div>
 
@@ -95,16 +99,29 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const boneListEl = document.getElementById('bone-list');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValEl = document.getElementById('speed-val');
         
         let width, height;
         let mouseX = 0, mouseY = 0;
         let isRightClick = false;
         let isMouseDown = false;
         
+        // Audio Assets
+        const soundLeft = new Audio('left.mp3');
+        const soundRight = new Audio('right.mp3');
+        
         // Editor State
         let selectedType = 'moving'; // moving, garment
         let symmetryEnabled = false;
+        let speedMultiplier = 1.0;
         
+        // Speed Slider Event
+        speedSlider.oninput = (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+            speedValEl.innerText = speedMultiplier.toFixed(1);
+        };
+
         // Animal State
         const animal = {
             pos: { x: 0, y: 0 },
@@ -143,10 +160,14 @@
             isRightClick = e.button === 2;
             createRipple(e.clientX, e.clientY, isRightClick ? 5 : 2);
             
-            // If clicking near head in editor mode
-            const editorX = 320 + 100; // Small preview area center
-            const editorY = 200;
-            // ... (Editor logic below)
+            // Play Sounds
+            if (isRightClick) {
+                soundRight.currentTime = 0;
+                soundRight.play();
+            } else {
+                soundLeft.currentTime = 0;
+                soundLeft.play();
+            }
         });
         
         window.addEventListener('mouseup', () => isMouseDown = false);
@@ -233,7 +254,7 @@
                 const dist = Math.hypot(dx, dy);
                 
                 animal.targetAngle = Math.atan2(dy, dx);
-                const speedTarget = isRightClick ? 5 : 2;
+                const speedTarget = (isRightClick ? 5 : 2) * speedMultiplier;
                 animal.speed += (speedTarget - animal.speed) * 0.05;
                 
                 // Slowly rotate head
@@ -282,7 +303,7 @@
             });
 
             // Calculate & Draw Skeleton
-            const time = performance.now() * 0.005;
+            const time = performance.now() * 0.005 * speedMultiplier;
             const bonePositions = new Map();
             
             animal.bones.forEach(bone => {
